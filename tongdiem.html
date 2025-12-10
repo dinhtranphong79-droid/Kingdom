@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Tổng Điểm</title>
+
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --accent:#2563eb;
+    --muted:#6b7280;
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif;}
+  body{
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{
+    width:100%;
+    max-width:720px;
+    background:var(--card);
+    border-radius:14px;
+    padding:18px 22px;
+    box-shadow:0 12px 40px rgba(2,6,23,0.08);
+  }
+  h1{margin:0 0 10px;font-size:20px;}
+  .status{
+    background:#eef4ff;
+    padding:10px 12px;
+    border-radius:10px;
+    margin-bottom:12px;
+    font-size:14px;
+    color:#333;
+  }
+  table{width:100%;border-collapse:collapse;margin-top:16px;}
+  th, td{
+    padding:10px;
+    border-bottom:1px solid #e6eef8;
+    font-size:15px;
+  }
+  th{text-align:left;color:var(--muted);font-size:13px;}
+  td.value{text-align:right;font-weight:700;}
+  tr.total td{
+    font-size:17px;
+    font-weight:800;
+    background:#f8fbff;
+    border-top:2px solid #dbe4ff;
+  }
+  button{
+    padding:8px 14px;
+    border:none;
+    background:var(--accent);
+    color:white;
+    border-radius:10px;
+    cursor:pointer;
+    margin-top:10px;
+    font-weight:600;
+  }
+</style>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, collection, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+import {
+  getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "YOURKEY",
+  authDomain: "YOUR",
+  projectId: "YOUR",
+  storageBucket: "YOUR",
+  messagingSenderId: "YOUR",
+  appId: "YOUR"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let currentUID = null;
+
+// ---------------- SIGN IN ----------------
+async function signIn(){
+  await signInWithPopup(auth, provider);
+}
+window.signIn = signIn;
+
+// ---------------- LOAD ALL TABS ----------------
+async function loadAllTabs(uid){
+  const base = collection(db, "accounts", uid, "tabsData");
+  const snaps = await getDocs(base);
+
+  const result = [];
+  snaps.forEach(docSnap=>{
+    const data = docSnap.data();
+    const total = data.totalPoints ?? 0;
+    result.push({
+      tab: docSnap.id,
+      total: total
+    });
+  });
+
+  return result;
+}
+
+// ---------------- RENDER TABLE ----------------
+function renderTable(rows){
+  const tbody = document.getElementById("rows");
+  tbody.innerHTML = "";
+
+  let sum = 0;
+
+  rows.forEach(r=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.tab}</td>
+      <td class="value">${Number(r.total).toLocaleString("vi-VN")}</td>
+    `;
+    tbody.appendChild(tr);
+    sum += Number(r.total)||0;
+  });
+
+  document.getElementById("sum").textContent =
+    sum.toLocaleString("vi-VN");
+}
+
+// ---------------- AUTH ----------------
+onAuthStateChanged(auth, async user=>{
+  const status = document.getElementById("status");
+
+  if(!user){
+    status.innerHTML = `
+      <button onclick="signIn()">Đăng nhập</button>
+      &nbsp;Bạn cần đăng nhập để xem tổng điểm
+    `;
+    return;
+  }
+
+  currentUID = user.uid;
+  status.textContent = `Đã đăng nhập: ${user.email}`;
+
+  const rows = await loadAllTabs(currentUID);
+  renderTable(rows);
+});
+
+// ---------------- MANUAL RELOAD ----------------
+window.reloadData = async function(){
+  if(!currentUID) return;
+  const rows = await loadAllTabs(currentUID);
+  renderTable(rows);
+};
+
+</script>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>Tổng Điểm</h1>
+    <div id="status" class="status">Đang kiểm tra đăng nhập…</div>
+
+    <table>
+      <thead>
+        <tr><th>Tab</th><th style="text-align:right">Điểm</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+
+      <tr class="total">
+        <td>Tổng cộng</td>
+        <td class="value" id="sum">0</td>
+      </tr>
+    </table>
+
+    <button onclick="reloadData()">Tải lại</button>
+  </div>
+</body>
+</html>
