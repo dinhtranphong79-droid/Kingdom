@@ -29,15 +29,17 @@
   .box{flex:1;min-width:220px;background:#fff;border-radius:10px;padding:10px;border:1px solid #eef6ff}
 </style>
 
-<!-- Firebase SDK -->
+<!-- ========================= -->
+<!--      FIREBASE MODULE      -->
+<!-- ========================= -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { 
-  getFirestore, doc, getDoc, setDoc, updateDoc 
+  getFirestore, doc, getDoc, setDoc
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-import { 
-  getAuth, onAuthStateChanged 
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -52,16 +54,32 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth();
+const provider = new GoogleAuthProvider();
 
 let currentUID = null;
 let saveTimeout = null;
 
-// ====== AUTOSAVE (debounce 700ms) ======
-function autoSave() {
+/* -------------------------------------
+   SIGN IN – DÙNG CHUNG TOÀN BỘ HỆ THỐNG
+-------------------------------------- */
+async function signIn(){
+  try{
+    await signInWithPopup(auth, provider);
+  }catch(err){
+    console.error("Login error:", err);
+  }
+}
+window.signIn = signIn;
+
+
+/* --------------------------
+   AUTOSAVE (DEBOUNCE 700ms)
+--------------------------- */
+function autoSave(){
   if (!currentUID) return;
 
   clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(async () => {
+  saveTimeout = setTimeout(async ()=>{
 
     const payload = {
       inputs: {
@@ -79,44 +97,52 @@ function autoSave() {
     };
 
     await setDoc(
-      doc(db, "accounts", currentUID, "tabsData", "dragon"),
+      doc(db,"accounts",currentUID,"tabsData","dragon"),
       payload,
       { merge: true }
     );
 
-  }, 700);
+  },700);
 }
+window.autoSave = autoSave;
 
-// ====== AUTOLOAD ======
-async function loadData(uid) {
 
+/* --------------------------
+      AUTOLOAD FROM DB
+--------------------------- */
+async function loadData(uid){
   const ref = doc(db, "accounts", uid, "tabsData", "dragon");
   const snap = await getDoc(ref);
 
-  if (snap.exists()) {
-    const data = snap.data();
+  if (snap.exists()){
+    const d = snap.data();
+    if (d.inputs){
 
-    if (data.inputs) {
-      haveB.value = data.inputs.haveB ?? 0;
-      haveA.value = data.inputs.haveA ?? 0;
-      haveSR.value = data.inputs.haveSR ?? 0;
-      haveSSR.value = data.inputs.haveSSR ?? 0;
-      lvlDong.value = data.inputs.lvlDong ?? 0;
-      lvlBac.value = data.inputs.lvlBac ?? 0;
-      lvlVang.value = data.inputs.lvlVang ?? 0;
-      lvlTK.value = data.inputs.lvlTK ?? 0;
-      lvlDragon.value = data.inputs.lvlDragon ?? 0;
+      haveB.value = d.inputs.haveB ?? 0;
+      haveA.value = d.inputs.haveA ?? 0;
+      haveSR.value = d.inputs.haveSR ?? 0;
+      haveSSR.value = d.inputs.haveSSR ?? 0;
+
+      lvlDong.value = d.inputs.lvlDong ?? 0;
+      lvlBac.value  = d.inputs.lvlBac ?? 0;
+      lvlVang.value = d.inputs.lvlVang ?? 0;
+      lvlTK.value   = d.inputs.lvlTK ?? 0;
+      lvlDragon.value = d.inputs.lvlDragon ?? 0;
+
     }
   }
 }
+window.loadData = loadData;
 
-// ====== After clicking "Tính tối ưu", save totalPoints ======
-async function saveTotalPoints(total) {
 
+/* --------------------------
+ SAVE TOTAL POINTS AFTER CALC
+--------------------------- */
+async function saveTotalPoints(total){
   if (!currentUID) return;
 
   await setDoc(
-    doc(db, "accounts", currentUID, "tabsData", "dragon"),
+    doc(db,"accounts",currentUID,"tabsData","dragon"),
     {
       totalPoints: total,
       updatedAt: new Date()
@@ -124,22 +150,45 @@ async function saveTotalPoints(total) {
     { merge: true }
   );
 }
+window.saveTotalPoints = saveTotalPoints;
 
-// ====== When logged in ======
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    currentUID = user.uid;
-    await loadData(currentUID);
+
+/* --------------------------
+     AUTH STATE
+--------------------------- */
+onAuthStateChanged(auth, async user=>{
+  if (!user){
+    currentUID = null;
+    return;
   }
+
+  currentUID = user.uid;
+
+  // tạo document nếu chưa có
+  const baseRef = doc(db,"accounts",currentUID,"tabsData","dragon");
+  const snap = await getDoc(baseRef);
+
+  if (!snap.exists()){
+    await setDoc(baseRef,{
+      inputs:{},
+      totalPoints:0,
+      createdAt:new Date()
+    });
+  }
+
+  await loadData(currentUID);
 });
 </script>
-
 </head>
+
+
+
 <body>
   <div class="wrap">
 
     <h1>Rồng</h1>
 
+    <!-- ====== INPUT UI (GIỮ NGUYÊN) ====== -->
     <div class="grid">
       <div class="card">
         <h3 style="margin:0 0 8px;font-size:15px">Tài nguyên</h3>
@@ -170,6 +219,7 @@ onAuthStateChanged(auth, async (user) => {
       <div class="small">Điểm: B=70, A=700, SR=7000, SSR=14000</div>
     </div>
 
+    <!-- ====== KẾT QUẢ ====== -->
     <div id="resultArea" class="result" style="display:none">
 
       <h3>Kết quả</h3>
@@ -213,6 +263,10 @@ onAuthStateChanged(auth, async (user) => {
   </div>
 
 <script>
+/* ================================
+   LOGIC TÍNH TOÁN GIỮ NGUYÊN 100%
+================================ */
+
 (function(){
 
   const COST_B  = 250;
@@ -239,9 +293,9 @@ onAuthStateChanged(auth, async (user) => {
 
     let st = {
       dong: parse(el("lvlDong")),
-      bac: parse(el("lvlBac")),
+      bac:  parse(el("lvlBac")),
       vang: parse(el("lvlVang")),
-      tk: parse(el("lvlTK")),
+      tk:   parse(el("lvlTK")),
       dragon: parse(el("lvlDragon"))
     };
 
@@ -255,21 +309,18 @@ onAuthStateChanged(auth, async (user) => {
         c=false;
 
         if(st.dong>=5){
-          let x = Math.floor(st.dong/5);
-          st.dong -= x*5;
-          st.bac  += x;
+          let x=Math.floor(st.dong/5);
+          st.dong-=x*5; st.bac+=x;
           c=true;
         }
         if(st.bac>=4){
-          let x = Math.floor(st.bac/4);
-          st.bac -= x*4;
-          st.vang+= x;
+          let x=Math.floor(st.bac/4);
+          st.bac-=x*4; st.vang+=x;
           c=true;
         }
         if(st.vang>=5){
-          let x = Math.floor(st.vang/5);
-          st.vang -= x*5;
-          st.tk   += x;
+          let x=Math.floor(st.vang/5);
+          st.vang-=x*5; st.tk+=x;
           c=true;
         }
       }
@@ -278,44 +329,39 @@ onAuthStateChanged(auth, async (user) => {
     promote();
 
     let go=true;
-
     while(go){
       go=false;
 
       if(have.B>=COST_B){
-        have.B -= COST_B; used.B += COST_B;
-        st.dong++; gain.dong++;
-        promote();
+        have.B-=COST_B; used.B+=COST_B;
+        st.dong++; gain.dong++; promote();
         go=true; continue;
       }
 
       if(have.A>=COST_A){
-        have.A -= COST_A; used.A += COST_A;
-        st.bac++; gain.bac++;
-        promote();
+        have.A-=COST_A; used.A+=COST_A;
+        st.bac++; gain.bac++; promote();
         go=true; continue;
       }
 
       if(have.SR>=COST_SR){
-        have.SR -= COST_SR; used.SR += COST_SR;
-        st.vang++; gain.vang++;
-        promote();
+        have.SR-=COST_SR; used.SR+=COST_SR;
+        st.vang++; gain.vang++; promote();
         go=true; continue;
       }
 
       let costSSR = (st.dragon+1)*10;
       if(have.SSR>=costSSR){
-        have.SSR -= costSSR; used.SSR += costSSR;
+        have.SSR-=costSSR; used.SSR+=costSSR;
         st.tk++; gain.tk++;
 
         st.dragon++; gain.dragon++;
-
         promote();
         go=true; continue;
       }
     }
 
-    // Show result
+    // Hiển thị kết quả
     el("resultArea").style.display="block";
 
     el("startDong").textContent=fmt(start.dong);
@@ -348,11 +394,12 @@ onAuthStateChanged(auth, async (user) => {
     let totalPoints =
       used.B*PT_B + used.A*PT_A + used.SR*PT_SR + used.SSR*PT_SSR;
 
-    el("ptsTotal").textContent=fmt(totalPoints);
+    el("ptsTotal").textContent = fmt(totalPoints);
 
-    // SAVE totalPoints to Firestore
+    // Lưu sang Firestore
     if (window.saveTotalPoints) saveTotalPoints(totalPoints);
   }
+
 
   el("compute").onclick = compute;
 
@@ -363,7 +410,8 @@ onAuthStateChanged(auth, async (user) => {
     if (window.autoSave) autoSave();
   };
 
-  // AUTOSAVE inputs
+
+  // AUTOSAVE khi nhập
   [
     "haveB","haveA","haveSR","haveSSR",
     "lvlDong","lvlBac","lvlVang","lvlTK","lvlDragon"
