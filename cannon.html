@@ -15,502 +15,308 @@ button:hover { filter: brightness(0.95); }
 pre.log { white-space: pre-wrap; font-family: monospace; }
 h2 { margin-bottom: 16px; }
 
-/* small top bar */
-.topbar { display:flex; justify-content:space-between; gap:12px; align-items:center; margin-bottom:12px;}
-.accountBox { font-size:14px; color:#333; background:#fff; padding:8px 12px; border-radius:10px; border:1px solid #ddd; }
-.status { font-size:13px; color:#666; margin-left:8px; }
+.statusBar {
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #fff7ed;
+    border:1px solid #fbbf24;
+    border-radius:10px;
+    font-size:14px;
+}
 </style>
 </head>
 <body>
+
 <div class="container">
-  <div class="topbar">
-    <div>
-      <strong>Level pháo</strong>
-      <span class="status" id="statusText"> (chưa đăng nhập)</span>
-    </div>
-    <div id="accountUi" class="accountBox">Đang tải...</div>
-  </div>
+<h2>Level pháo</h2>
 
-  <div class="input-group"><label>Đá</label><input type="number" id="stone" value="0" min="0"></div>
-  <div class="input-group"><label>Gỗ</label><input type="number" id="wood" value="0" min="0"></div>
-  <div class="input-group"><label>Quặng</label><input type="number" id="ore" value="0" min="0"></div>
-  <div class="input-group"><label>Hộp pháo</label><input type="number" id="boxes" value="0" min="0"></div>
-  <div class="input-group"><label>Cấp mục tiêu (để trống nếu muốn tính cấp tối đa)</label><input type="number" id="targetLevel" value="" min="1" placeholder="Để trống nếu muốn tính cấp tối đa"></div>
+<div id="status" class="statusBar">Đang kiểm tra tài khoản…</div>
 
-  <button id="btnCompute">Tính</button>
-  <div id="output" class="result" style="visibility:hidden"></div>
+<div class="input-group"><label>Đá</label><input type="number" id="stone" value="0" min="0"></div>
+<div class="input-group"><label>Gỗ</label><input type="number" id="wood" value="0" min="0"></div>
+<div class="input-group"><label>Quặng</label><input type="number" id="ore" value="0" min="0"></div>
+<div class="input-group"><label>Hộp pháo</label><input type="number" id="boxes" value="0" min="0"></div>
+<div class="input-group"><label>Cấp mục tiêu</label><input type="number" id="targetLevel" value="" min="1" placeholder="Để trống nếu muốn tính cấp tối đa"></div>
 
-  <!-- mini history -->
-  <h3>Lịch sử thao tác (gần nhất)</h3>
-  <div id="miniHistory" class="result" style="max-height:160px; overflow:auto;"></div>
+<button id="btnCompute">Tính</button>
+<div id="output" class="result" style="visibility:hidden"></div>
 </div>
 
-<!-- Firebase SDKs (v9 modular) -->
+<!-- FIREBASE -->
 <script type="module">
-  // ---------------------
-  // 1) Firebase init - THAY cấu hình bên dưới bằng config project của bạn
-  // ---------------------
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc, updateDoc, runTransaction, collection, addDoc, query, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+import { 
+    getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider 
+} from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { 
+    getFirestore, doc, getDoc, setDoc, updateDoc, runTransaction, serverTimestamp 
+} from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
 
-  const firebaseConfig = {
-    // <-- THAY CHỖ NÀY BẰNG FIREBASE CONFIG CỦA BẠN -->
-    apiKey: "FIREBASE_APIKEY_HERE",
-    authDomain: "FIREBASE_AUTHDOMAIN",
-    projectId: "FIREBASE_PROJECTID",
-    // các trường khác nếu có...
-  };
+/* ---------------------------------------------------------
+   1) FIREBASE CONFIG – BẠN PHẢI THAY BẰNG CONFIG THẬT
+--------------------------------------------------------- */
+const firebaseConfig = {
+    apiKey: "XXXX",
+    authDomain: "XXXX",
+    projectId: "XXXX",
+    storageBucket: "XXXX",
+    messagingSenderId: "XXXX",
+    appId: "XXXX"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
-  // ---------------------
-  // 2) App state
-  // ---------------------
-  let currentUser = null;
-  let accountDocRef = null; // doc('/accounts/{uid}')
-  const ACCOUNT_PATH = uid => `accounts/${uid}`;
+const provider = new GoogleAuthProvider();
 
-  // default target config for a newly created account
-  const DEFAULT_TARGETS = {
-    cannon: { initial: 3000, remaining: 3000 },
-    aegis:  { initial: 5000, remaining: 5000 }
-  };
+let currentUID = null;
+let cannonRemaining = 0;
 
-  // UI refs
-  const $ = id => document.getElementById(id);
-  const statusText = $('statusText');
-  const accountUi = $('accountUi');
-  const output = $('output');
-  const miniHistory = $('miniHistory');
-
-  // ---------------------
-  // 3) Helper: simulate logic (unchanged from original)
-  // ---------------------
-  function toNum(id){
-      let v = Number(document.getElementById(id).value);
-      return (isNaN(v) || v<0) ? 0 : v;
-  }
-
-  function simulateOptimal(S, W, Q, B, lv){
-      let stone=S, wood=W, ore=Q, box=B, log=[];
-      const needStone = 1260*lv;
-      const needWood = 340*lv;
-      const needOre = 130*lv;
-
-      let boxForOre = Math.min(box, needOre - ore);
-      if(boxForOre>0){
-          log.push(`Dùng ${boxForOre} hộp → +${boxForOre} quặng`);
-          ore += boxForOre; box -= boxForOre;
-      }
-      let boxForWood = Math.min(box, Math.ceil((needWood - wood)/4));
-      if(boxForWood>0){
-          log.push(`Dùng ${boxForWood} hộp → +${boxForWood*4} gỗ`);
-          wood += boxForWood*4; box -= boxForWood;
-      }
-      if(box>0){
-          log.push(`Dùng ${box} hộp → +${box*20} đá`);
-          stone += box; box=0;
-      }
-
-      while(true){
-          let missOre = Math.max(0, needOre - ore);
-          let missWood = Math.max(0, needWood - wood);
-
-          let stoneToWood = Math.min(Math.floor(stone/5), missWood + missOre*4);
-          if(stoneToWood>0){
-              log.push(`Đổi ${stoneToWood*5} đá → +${stoneToWood} gỗ`);
-              stone -= stoneToWood*5; wood += stoneToWood;
-          }
-
-          let woodToOre = Math.min(Math.floor(wood/4), missOre);
-          if(woodToOre>0){
-              log.push(`Đổi ${woodToOre*4} gỗ → +${woodToOre} quặng`);
-              wood -= woodToOre*4; ore += woodToOre;
-          }
-
-          if(stoneToWood===0 && woodToOre===0) break;
-      }
-
-      let missStone = Math.max(0, needStone - stone);
-      let missWood = Math.max(0, needWood - wood);
-      let missOre = Math.max(0, needOre - ore);
-      if(missStone>0 || missWood>0 || missOre>0){
-          return {ok:false, missing:{stone:missStone, wood:missWood, ore:missOre}, log:log};
-      }
-
-      stone -= needStone;
-      wood -= needWood;
-      ore -= needOre;
-
-      return {ok:true, log, remaining:{stone, wood, ore}};
-  }
-
-  function computeMaxLv(S,W,Q,B){
-      let lo=0, hi=20000, lastLog=[], lastRemaining=null;
-      while(lo<hi){
-          let mid = Math.floor((lo+hi+1)/2);
-          let result = simulateOptimal(S,W,Q,B,mid);
-          if(result.ok){
-              lo = mid;
-              lastLog = result.log;
-              lastRemaining = result.remaining;
-          } else {
-              hi = mid-1;
-          }
-      }
-      return {maxLv: lo, log: lastLog, remaining: lastRemaining};
-  }
-
-  // ---------------------
-  // 4) Auth and load account data
-  // ---------------------
-  const provider = new GoogleAuthProvider();
-
-  async function signIn() {
-    try {
-      // popup sign-in (you can change to email/password if preferred)
-      await signInWithPopup(auth, provider);
-      // onAuthStateChanged will handle loading
-    } catch (err) {
-      console.error("Sign-in failed", err);
-      alert("Đăng nhập thất bại: " + err.message);
+/* ---------------------------------------------------------
+   2) TỰ ĐỘNG LOGIN BẰNG POPUP NẾU CHƯA ĐĂNG NHẬP
+--------------------------------------------------------- */
+function loginIfNeeded() {
+    if (!auth.currentUser) {
+        signInWithPopup(auth, provider);
     }
-  }
+}
 
-  // auto sign-in on load if not signed in (this is optional)
-  // We'll show a simple login button if not logged.
-  function renderAccountUi() {
-    if (!currentUser) {
-      accountUi.innerHTML = `<button id="btnLogin">Đăng nhập</button>`;
-      $('btnLogin').onclick = signIn;
-      statusText.innerText = " (chưa đăng nhập)";
-    } else {
-      accountUi.innerHTML = `<div><strong>${currentUser.email}</strong></div><div style="font-size:12px;color:#666">Account auto-load data</div>`;
-      statusText.innerText = " (đã đăng nhập)";
-    }
-  }
+/* ---------------------------------------------------------
+   3) LOAD DỮ LIỆU PHÁO THEO UID
+--------------------------------------------------------- */
+async function loadCannonData(uid, email) {
 
-  async function createAccountIfMissing(uid, email) {
-    const ref = doc(db, ACCOUNT_PATH(uid));
-    const snap = await getDoc(ref);
+    const docRef = doc(db, "accounts", uid);
+
+    const snap = await getDoc(docRef);
+
+    // Nếu chưa có document → tạo mới
     if (!snap.exists()) {
-      // create default account document for this user
-      await setDoc(ref, {
-        ownerUid: uid,
-        email: email || "",
-        targets: DEFAULT_TARGETS,
-        tabsData: {},
-        updatedAt: new Date()
-      });
-    } else {
-      // ensure targets exist
-      const data = snap.data();
-      if (!data.targets) {
-        await updateDoc(ref, { targets: DEFAULT_TARGETS, updatedAt: new Date() });
-      } else {
-        // if missing cannon or aegis keys, set them
-        const t = data.targets || {};
-        const updates = {};
-        if (!t.cannon) updates['targets.cannon'] = DEFAULT_TARGETS.cannon;
-        if (!t.aegis) updates['targets.aegis'] = DEFAULT_TARGETS.aegis;
-        if (Object.keys(updates).length) {
-          updates.updatedAt = new Date();
-          await updateDoc(ref, updates);
-        }
-      }
-    }
-    return ref;
-  }
+        let defaultTarget = 3000;
 
-  async function loadAccountData(uid) {
-    accountDocRef = doc(db, ACCOUNT_PATH(uid));
-    const snap = await getDoc(accountDocRef);
-    if (!snap.exists()) {
-      console.warn("Account doc missing after create? trying create");
-      await createAccountIfMissing(uid, currentUser.email);
-      return loadAccountData(uid);
-    }
-    const data = snap.data();
-    // populate UI from data.tabsData.cannon if present
-    const tabsData = (data.tabsData && data.tabsData.cannon) || {};
-    if (tabsData.lastInput) {
-      const inp = tabsData.lastInput;
-      $('stone').value = inp.stone ?? $('stone').value;
-      $('wood').value = inp.wood ?? $('wood').value;
-      $('ore').value = inp.ore ?? $('ore').value;
-      $('boxes').value = inp.boxes ?? $('boxes').value;
-      $('targetLevel').value = inp.targetLevel ?? $('targetLevel').value;
-    }
-    // show remaining target if present
-    const remaining = (data.targets && data.targets.cannon && data.targets.cannon.remaining) ?? DEFAULT_TARGETS.cannon.remaining;
-    renderRemaining(remaining);
+        if (email === "minhlanne@dolvar.app") defaultTarget = 3000;
+        if (email === "aegis@dolvar.app")     defaultTarget = 5000;
 
-    // render mini history
-    await renderMiniHistory(uid);
-
-    // set accountRef global
-    accountDocRef = doc(db, ACCOUNT_PATH(uid));
-  }
-
-  async function renderMiniHistory(uid) {
-    miniHistory.innerHTML = "Đang tải lịch sử...";
-    try {
-      // fetch most recent 10 history items for this account & tab 'cannon'
-      const hCol = collection(db, `${ACCOUNT_PATH(uid)}/history`);
-      const q = query(hCol, orderBy('ts','desc'), limit(10));
-      const snaps = await getDocs(q);
-      if (snaps.empty) {
-        miniHistory.innerText = "Chưa có lịch sử.";
-        return;
-      }
-      miniHistory.innerHTML = snaps.docs.map(d => {
-        const dd = d.data();
-        const t = dd.ts && dd.ts.toDate ? dd.ts.toDate().toLocaleString() : (dd.ts?String(dd.ts):'');
-        return `<div style="margin-bottom:8px">
-          <div><strong>${dd.tab}</strong> — nâng: ${dd.appliedUpgraded ?? dd.upgraded} (prev ${dd.prevRemaining} → ${dd.newRemaining})</div>
-          <div style="font-size:12px;color:#666">${t}</div>
-        </div>`;
-      }).join('');
-    } catch (err) {
-      console.error("Load mini history failed", err);
-      miniHistory.innerText = "Không thể tải lịch sử.";
-    }
-  }
-
-  // show remaining text (small)
-  function renderRemaining(remaining) {
-    // append remaining to status
-    const rtext = ` — Mục tiêu pháo còn: ${remaining}`;
-    if (currentUser) accountUi.innerHTML = `<div><strong>${currentUser.email}</strong></div><div style="font-size:12px;color:#666">${rtext}</div>`;
-    else accountUi.innerText = "Không đăng nhập";
-  }
-
-  // ---------------------
-  // 5) Autosave for cannon tab (debounced)
-  // ---------------------
-  let saveTimer = null;
-  function autosaveCannon() {
-    if (!accountDocRef || !currentUser) return;
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
-      try {
-        const lastInput = {
-          stone: toNum('stone'),
-          wood: toNum('wood'),
-          ore: toNum('ore'),
-          boxes: toNum('boxes'),
-          targetLevel: (document.getElementById('targetLevel').value||"").trim()
-        };
-        const tabPath = `${ACCOUNT_PATH(currentUser.uid)}`;
-        const docRef = doc(db, tabPath);
-        // set tabsData.cannon.lastInput
-        await updateDoc(docRef, { 
-          [`tabsData.cannon.lastInput`]: lastInput,
-          updatedAt: new Date()
+        await setDoc(docRef, {
+            email: email,
+            cannonRemaining: defaultTarget,
+            createdAt: serverTimestamp()
         });
-        // small visual (we don't change UI here to keep layout minimal)
-      } catch (err) {
-        // if updateDoc fails because doc missing, create doc
-        try {
-          await setDoc(doc(db, ACCOUNT_PATH(currentUser.uid)), {
-            ownerUid: currentUser.uid,
-            email: currentUser.email,
-            targets: DEFAULT_TARGETS,
-            tabsData: { cannon: { lastInput: {
-              stone: toNum('stone'),
-              wood: toNum('wood'),
-              ore: toNum('ore'),
-              boxes: toNum('boxes'),
-              targetLevel: (document.getElementById('targetLevel').value||"").trim()
-            } } },
-            updatedAt: new Date()
-          }, { merge: true });
-        } catch(e2){
-          console.error("Autosave create failed", e2);
+
+        cannonRemaining = defaultTarget;
+    } 
+    else {
+        cannonRemaining = snap.data().cannonRemaining ?? 3000;
+    }
+
+    document.getElementById("status").innerHTML =
+        `Tài khoản: <b>${email}</b> — Mục tiêu còn lại: <b>${cannonRemaining}</b>`;
+}
+
+/* ---------------------------------------------------------
+   4) AUTO-SAVE INPUT (khi người dùng nhập)
+--------------------------------------------------------- */
+async function autosaveInput() {
+    if (!currentUID) return;
+
+    const docRef = doc(db, "accounts", currentUID);
+
+    await updateDoc(docRef, {
+        cannonInput: {
+            stone: Number(stone.value) || 0,
+            wood: Number(wood.value) || 0,
+            ore:  Number(ore.value) || 0,
+            boxes: Number(boxes.value) || 0,
+            target: targetLevel.value
         }
-      }
-    }, 700); // debounce 700ms
-  }
+    });
+}
 
-  // attach autosave on inputs
-  ['stone','wood','ore','boxes','targetLevel'].forEach(id=>{
-    const el = document.getElementById(id);
-    el.addEventListener('input', autosaveCannon);
-  });
+["stone","wood","ore","boxes","targetLevel"].forEach(id => {
+    document.getElementById(id).addEventListener("input", autosaveInput);
+});
 
-  // ---------------------
-  // 6) Compute handler with Firestore transaction and history
-  // ---------------------
-  $('btnCompute').addEventListener('click', async function(){
-    // run local compute (exactly same logic as before)
-    const S = toNum('stone'), W = toNum('wood'), Q = toNum('ore'), B = toNum('boxes');
-    const targetInput = (document.getElementById('targetLevel').value||"").trim();
-    output.style.visibility='visible';
+/* ---------------------------------------------------------
+   5) TÍNH VÀ TRỪ MỤC TIÊU BẰNG TRANSACTION
+--------------------------------------------------------- */
+async function deductTarget(levelUp) {
+    const docRef = doc(db, "accounts", currentUID);
 
-    // local computation
-    let localUpgraded = 0; // number of levels that this compute would upgrade (to be applied to remaining)
-    let localMsg = ""; 
-    let resultForDisplay = null;
+    await runTransaction(db, async (tx) => {
+        const snap = await tx.get(docRef);
+        if (!snap.exists()) throw "Account missing";
+
+        const prev = snap.data().cannonRemaining ?? 0;
+        const applied = Math.min(prev, levelUp);
+        const newRemaining = prev - applied;
+
+        tx.update(docRef, {
+            cannonRemaining: newRemaining,
+            lastUsed: serverTimestamp()
+        });
+
+        cannonRemaining = newRemaining;
+
+        document.getElementById("status").innerHTML =
+            `Tài khoản: <b>${snap.data().email}</b> — Mục tiêu còn lại: <b>${newRemaining}</b>`;
+    });
+}
+
+/* ---------------------------------------------------------
+   6) LOGIC TÍNH GỐC – GIỮ NGUYÊN 100%
+--------------------------------------------------------- */
+function toNum(id){
+    let v = Number(document.getElementById(id).value);
+    return (isNaN(v) || v<0) ? 0 : v;
+}
+
+/* --- Simulate tối ưu: đá + gỗ + quặng + hộp pháo --- */
+function simulateOptimal(S, W, Q, B, lv){
+    let stone=S, wood=W, ore=Q, box=B, log=[];
+    const needStone = 1260*lv;
+    const needWood = 340*lv;
+    const needOre = 130*lv;
+
+    let boxForOre = Math.min(box, needOre - ore);
+    if(boxForOre>0){
+        log.push(`Dùng ${boxForOre} hộp → +${boxForOre} quặng`);
+        ore += boxForOre; box -= boxForOre;
+    }
+    let boxForWood = Math.min(box, Math.ceil((needWood - wood)/4));
+    if(boxForWood>0){
+        log.push(`Dùng ${boxForWood} hộp → +${boxForWood*4} gỗ`);
+        wood += boxForWood*4; box -= boxForWood;
+    }
+    if(box>0){
+        log.push(`Dùng ${box} hộp → +${box*20} đá`);
+        stone += box; box=0;
+    }
+
+    while(true){
+        let missOre = Math.max(0, needOre - ore);
+        let missWood = Math.max(0, needWood - wood);
+
+        let stoneToWood = Math.min(Math.floor(stone/5), missWood + missOre*4);
+        if(stoneToWood>0){
+            log.push(`Đổi ${stoneToWood*5} đá → +${stoneToWood} gỗ`);
+            stone -= stoneToWood*5; wood += stoneToWood;
+        }
+
+        let woodToOre = Math.min(Math.floor(wood/4), missOre);
+        if(woodToOre>0){
+            log.push(`Đổi ${woodToOre*4} gỗ → +${woodToOre} quặng`);
+            wood -= woodToOre*4; ore += woodToOre;
+        }
+
+        if(stoneToWood===0 && woodToOre===0) break;
+    }
+
+    let missStone = Math.max(0, needStone - stone);
+    let missWood = Math.max(0, needWood - wood);
+    let missOre = Math.max(0, needOre - ore);
+    if(missStone>0 || missWood>0 || missOre>0){
+        return {ok:false, missing:{stone:missStone, wood:missWood, ore:missOre}, log:log};
+    }
+
+    stone -= needStone;
+    wood -= needWood;
+    ore -= needOre;
+
+    return {ok:true, log, remaining:{stone, wood, ore}};
+}
+
+/* --- Tính cấp tối đa bằng binary search --- */
+function computeMaxLv(S,W,Q,B){
+    let lo=0, hi=20000, lastLog=[], lastRemaining=null;
+    while(lo<hi){
+        let mid = Math.floor((lo+hi+1)/2);
+        let result = simulateOptimal(S,W,Q,B,mid);
+        if(result.ok){
+            lo = mid;
+            lastLog = result.log;
+            lastRemaining = result.remaining;
+        } else {
+            hi = mid-1;
+        }
+    }
+    return {maxLv: lo, log: lastLog, remaining: lastRemaining};
+}
+
+/* ---------------------------------------------------------
+   7) CLICK = TÍNH + TRỪ TARGET
+--------------------------------------------------------- */
+async function compute(){
+    if (!currentUID) return loginIfNeeded();
+
+    let S = toNum('stone'), W = toNum('wood'), Q = toNum('ore'), B = toNum('boxes');
+    let targetInput = document.getElementById('targetLevel').value.trim();
+    const out = document.getElementById('output');
+    out.style.visibility='visible';
+
+    let levelUp = 0;
+
     if(targetInput !== ""){
-      let target = Math.max(1, Number(targetInput));
-      let result = simulateOptimal(S,W,Q,B,target);
-      resultForDisplay = result;
-      if(result.ok){
-        localUpgraded = target;
-      } else {
-        // not enough resources to reach that target -> missing
-        localUpgraded = 0;
-      }
-    } else {
-      let res = computeMaxLv(S,W,Q,B);
-      resultForDisplay = res;
-      localUpgraded = res.maxLv;
-    }
-
-    // display local result immediately (keeping original UI)
-    if(targetInput !== ""){
-      // earlier logic
-      let target = Math.max(1, Number(targetInput));
-      const result = resultForDisplay;
-      if(result.ok){
-        output.innerHTML=`<b>Có thể đạt cấp:</b> ${target}<br>
-          <b>Tổng điểm:</b> ${target*556}<br><br>
-          <b>Các bước đổi:</b><br><pre class="log">${(result.log||[]).join('\n')}</pre><br>
-          <b>Còn lại:</b><br>
-          <ul><li>Đá: ${result.remaining.stone}</li>
-          <li>Gỗ: ${result.remaining.wood}</li>
-          <li>Quặng: ${result.remaining.ore}</li></ul>`;
-      } else {
-        let miss = result.missing;
-        output.innerHTML=`<b>Không đủ tài nguyên để đạt cấp ${target}</b><br>
-          <b>Còn thiếu:</b><br>
-          <ul><li>Đá: ${miss.stone}</li>
-          <li>Gỗ: ${miss.wood}</li>
-          <li>Quặng: ${miss.ore}</li></ul>`;
-      }
-    } else {
-      const res = resultForDisplay;
-      if(res.remaining){
-        output.innerHTML=`<b>Cấp tối đa:</b> ${res.maxLv}<br>
-          <b>Tổng điểm:</b> ${res.maxLv*556}<br><br>
-          <b>Các bước đổi:</b><br><pre class="log">${(res.log||[]).join('\n')}</pre><br>
-          <b>Còn lại:</b><br>
-          <ul><li>Đá: ${res.remaining.stone}</li>
-          <li>Gỗ: ${res.remaining.wood}</li>
-          <li>Quặng: ${res.remaining.ore}</li></ul>`;
-      } else {
-        output.innerHTML=`<b>Không đủ tài nguyên để nâng cấp</b>`;
-      }
-    }
-
-    // If not logged in, do not attempt DB transaction; just return after showing result.
-    if (!currentUser || !accountDocRef) {
-      // optionally prompt login
-      if (!currentUser) {
-        alert("Bạn chưa đăng nhập — kết quả chỉ hiển thị cục bộ. Đăng nhập để lưu và trừ target.");
-      }
-      return;
-    }
-
-    // Proceed to run a transaction to deduct remaining on server and record history
-    try {
-      const accountRef = doc(db, ACCOUNT_PATH(currentUser.uid));
-      await runTransaction(db, async (tx) => {
-        const accSnap = await tx.get(accountRef);
-        if (!accSnap.exists()) {
-          throw "Account doc không tồn tại";
+        let target = Math.max(1, Number(targetInput));
+        let result = simulateOptimal(S,W,Q,B,target);
+        if(result.ok){
+            out.innerHTML=`<b>Có thể đạt cấp:</b> ${target}<br>
+            <b>Tổng điểm:</b> ${target*556000}<br><br>
+            <b>Các bước đổi:</b><br><pre class="log">${result.log.join('\n')}</pre><br>
+            <b>Còn lại:</b><br>
+            <ul><li>Đá: ${result.remaining.stone}</li>
+            <li>Gỗ: ${result.remaining.wood}</li>
+            <li>Quặng: ${result.remaining.ore}</li></ul>`;
+            levelUp = target;
+        } 
+        else {
+            let miss = result.missing;
+            out.innerHTML=`<b>Không đủ tài nguyên để đạt cấp ${target}</b><br>
+            <b>Còn thiếu:</b><br>
+            <ul><li>Đá: ${miss.stone}</li>
+            <li>Gỗ: ${miss.wood}</li>
+            <li>Quặng: ${miss.ore}</li></ul>`;
+            levelUp = 0;
         }
-        const accData = accSnap.data();
-        const prevRem = (accData.targets && accData.targets.cannon && typeof accData.targets.cannon.remaining === 'number')
-                        ? accData.targets.cannon.remaining
-                        : DEFAULT_TARGETS.cannon.remaining;
-        // Determine applied upgraded = min(localUpgraded, prevRem)
-        const applied = Math.min(localUpgraded, prevRem);
-        const newRem = Math.max(0, prevRem - applied);
-
-        // update remaining and save last result & last input
-        const lastInputObj = {
-          stone: toNum('stone'),
-          wood: toNum('wood'),
-          ore: toNum('ore'),
-          boxes: toNum('boxes'),
-          targetLevel: (document.getElementById('targetLevel').value||"").trim()
-        };
-
-        // prepare update payload
-        const updates = {
-          'targets.cannon.remaining': newRem,
-          'tabsData.cannon.lastInput': lastInputObj,
-          'tabsData.cannon.lastResult': {
-            computedAt: new Date(),
-            localUpgraded: localUpgraded,
-            appliedUpgraded: applied,
-            infoForDisplay: output.innerHTML
-          },
-          updatedAt: new Date()
-        };
-
-        tx.update(accountRef, updates);
-
-        // add history doc (collection)
-        const historyColRef = collection(db, `${ACCOUNT_PATH(currentUser.uid)}/history`);
-        // we can't tx.set to a random auto id easily; but we can use addDoc outside tx.
-        // Instead we push minimal history doc via tx.update with an array? To keep it simple and atomic:
-        // We'll store history by creating a new doc with addDoc AFTER transaction — it's acceptable.
-        // But we will return values from transaction to the outer scope via resolved promise value
-        return { prevRemaining: prevRem, newRemaining: newRem, applied: applied, lastInputObj };
-      }).then(async (txResult) => {
-        // after transaction success, add history doc (not in transaction)
-        try {
-          await addDoc(collection(db, `${ACCOUNT_PATH(currentUser.uid)}/history`), {
-            tab: 'cannon',
-            upgraded: localUpgraded,
-            appliedUpgraded: txResult.applied,
-            prevRemaining: txResult.prevRemaining,
-            newRemaining: txResult.newRemaining,
-            input: txResult.lastInputObj,
-            ts: new Date(),
-            userEmail: currentUser.email || null
-          });
-        } catch (e) {
-          console.error("Cannot write history doc", e);
+    } 
+    else {
+        let res = computeMaxLv(S,W,Q,B);
+        if(res.remaining){
+            out.innerHTML=`<b>Cấp tối đa:</b> ${res.maxLv}<br>
+            <b>Tổng điểm:</b> ${res.maxLv*556000}<br><br>
+            <b>Các bước đổi:</b><br><pre class="log">${res.log.join('\n')}</pre><br>
+            <b>Còn lại:</b><br>
+            <ul><li>Đá: ${res.remaining.stone}</li>
+            <li>Gỗ: ${res.remaining.wood}</li>
+            <li>Quặng: ${res.remaining.ore}</li></ul>`;
+            levelUp = res.maxLv;
+        } 
+        else {
+            out.innerHTML=`<b>Không đủ tài nguyên để nâng cấp</b>`;
+            levelUp = 0;
         }
-        // update UI remaining
-        renderRemaining(txResult.newRemaining);
-        // refresh mini history
-        await renderMiniHistory(currentUser.uid);
-      }).catch(err=>{
-        console.error("Transaction failed", err);
-        alert("Cập nhật target thất bại: " + err);
-      });
-    } catch (err) {
-      console.error("Compute transaction error", err);
-      alert("Lỗi khi cập nhật target: " + err);
     }
-  });
 
-  // ---------------------
-  // 7) Auth state listener
-  // ---------------------
-  onAuthStateChanged(auth, async (user) => {
-    currentUser = user;
-    renderAccountUi();
-    if (currentUser) {
-      // ensure account doc exists then load
-      await createAccountIfMissing(currentUser.uid, currentUser.email);
-      await loadAccountData(currentUser.uid);
-    } else {
-      // not signed in; render UI accordingly
-      accountUi.innerText = "Chưa đăng nhập";
+    await deductTarget(levelUp);
+}
+
+document.getElementById('btnCompute').addEventListener('click', compute);
+
+/* ---------------------------------------------------------
+   8) LISTENER – TỰ LOAD DATA KHI LOGIN
+--------------------------------------------------------- */
+onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+        document.getElementById("status").innerHTML =
+            `<button onclick="loginIfNeeded()">Đăng nhập</button>`;
+        return;
     }
-  });
 
-  // initial render
-  renderAccountUi();
+    currentUID = user.uid;
 
+    await loadCannonData(user.uid, user.email);
+});
 </script>
+
 </body>
 </html>
