@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Barracks</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 20px; background:#f5f5f5; color:#222; }
+  h1 { margin-top: 0; }
+  h2 { margin-top: 20px; }
+  .card { background:white; padding:20px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:20px; }
+  table { width:100%; border-collapse: collapse; margin-top:10px; }
+  table th, table td { border:1px solid #e0e0e0; padding:8px; text-align:center; }
+  .input-small { width:70px; padding:4px; }
+  .row { display:flex; gap:20px; margin-top:15px; }
+  .col { flex:1; }
+  .total-box { font-size:18px; font-weight:bold; padding:15px; background:#e7f4ff; border-radius:10px; text-align:center; }
+  .muted { color:#666; font-size:13px; }
+  .calc-popup{position:absolute;background:#fff;border:1px solid #ccc;border-radius:10px;padding:10px;box-shadow:0 6px 18px rgba(0,0,0,.12);z-index:9999;width:200px}
+  .calc-display{width:100%;height:36px;border:1px solid #eee;padding:6px;text-align:right;font-size:18px;margin-bottom:8px}
+  .calc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .calc-grid button{padding:8px;border-radius:6px;border:1px solid #ddd;background:#fafafa;cursor:pointer}
+  .calc-close{position:absolute;top:-10px;right:-10px;width:24px;height:24px;border-radius:50%;background:#f44336;color:#fff;border:none;cursor:pointer}
+  .statusBar { margin-bottom:12px; padding:8px 10px; background:#fff7ed; border:1px solid #fbbf24; border-radius:8px; font-size:14px;}
+</style>
+</head>
+<body>
+<h1>Barracks</h1>
+
+<div id="authStatus" class="statusBar">Đang kiểm tra đăng nhập…</div>
+
+<div class="card">
+  <h2>Season & Tài nguyên</h2>
+  <div class="row">
+    <div class="col">
+      <label>Season: <select id="seasonSelect"></select></label>
+      <div>Điểm sách thiên phú: <span id="spBook">-</span></div>
+      <div>Điểm vương miện: <span id="spCrown">-</span></div>
+    </div>
+    <div class="col">
+      <div>Sách thiên phú: <input id="inBooks" type="number" class="input-small" value="0" min="0"></div>
+      <div>Vương miện: <input id="inCrowns" type="number" class="input-small" value="0" min="0"></div>
+    </div>
+    <div class="col">
+      <h4>Sách lính</h4>
+      <div>T1 <input id="t1" class="input-small troop-input" type="number" value="0" min="0"></div>
+      <div>T2 <input id="t2" class="input-small troop-input" type="number" value="0" min="0"></div>
+      <div>T3 <input id="t3" class="input-small troop-input" type="number" value="0" min="0"></div>
+      <div>T4 <input id="t4" class="input-small troop-input" type="number" value="0" min="0"></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>GM1</h2>
+  <table id="gm1Table">
+    <thead>
+      <tr><th>Tier</th>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Đã nâng</td>
+        <td><input type="number" class="input-small gm1Done" data-tier="0" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="1" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="2" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="3" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="4" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="5" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="6" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="7" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="8" min="0" max="48" value="0"></td>
+        <td><input type="number" class="input-small gm1Done" data-tier="9" min="0" max="48" value="0"></td>
+      </tr>
+      <tr>
+        <td>Nâng được</td>
+        <td class="gm1Result" data-tier="0">0</td>
+        <td class="gm1Result" data-tier="1">0</td>
+        <td class="gm1Result" data-tier="2">0</td>
+        <td class="gm1Result" data-tier="3">0</td>
+        <td class="gm1Result" data-tier="4">0</td>
+        <td class="gm1Result" data-tier="5">0</td>
+        <td class="gm1Result" data-tier="6">0</td>
+        <td class="gm1Result" data-tier="7">0</td>
+        <td class="gm1Result" data-tier="8">0</td>
+        <td class="gm1Result" data-tier="9">0</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>GM2</h2>
+  <table id="gm2Table">
+    <thead>
+      <tr><th>Tier</th>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Đã nâng</td>
+        <td><input type="number" class="input-small gm2Done" data-tier="0" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="1" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="2" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="3" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="4" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="5" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="6" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="7" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="8" min="0" max="6" value="0"></td>
+        <td><input type="number" class="input-small gm2Done" data-tier="9" min="0" max="6" value="0"></td>
+      </tr>
+      <tr>
+        <td>Nâng được</td>
+        <td class="gm2Result" data-tier="0">0</td>
+        <td class="gm2Result" data-tier="1">0</td>
+        <td class="gm2Result" data-tier="2">0</td>
+        <td class="gm2Result" data-tier="3">0</td>
+        <td class="gm2Result" data-tier="4">0</td>
+        <td class="gm2Result" data-tier="5">0</td>
+        <td class="gm2Result" data-tier="6">0</td>
+        <td class="gm2Result" data-tier="7">0</td>
+        <td class="gm2Result" data-tier="8">0</td>
+        <td class="gm2Result" data-tier="9">0</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card total-box" id="totalDisplay">Tổng điểm: 0</div>
+
+<script type="module">
+/* ============================
+   Firebase + Firestore setup
+   ============================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+
+/* ---------- REPLACE WITH YOUR FIREBASE CONFIG ---------- */
+const firebaseConfig = {
+  apiKey: "YOUR_APIKEY",
+  authDomain: "YOUR_AUTHDOMAIN",
+  projectId: "YOUR_PROJECTID",
+  storageBucket: "YOUR_STORAGEBUCKET",
+  messagingSenderId: "YOUR_MSG_SENDER",
+  appId: "YOUR_APPID"
+};
+/* ------------------------------------------------------ */
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const provider = new GoogleAuthProvider();
+
+/* ============================
+   Original logic (kept)
+   ============================ */
+(function(){
+  // --- Core data ---
+  const seasons = [
+    {name:"Season 20", bookPoint:2.8, crownPoint:28},
+    {name:"Season 21", bookPoint:1.12, crownPoint:11.2},
+    {name:"Season 22", bookPoint:1.12, crownPoint:11.2},
+    {name:"Season 23", bookPoint:1.12, crownPoint:11.2},
+    {name:"Season 24", bookPoint:1.12, crownPoint:11.2},
+    {name:"Season 25", bookPoint:0.56, crownPoint:5.6},
+    {name:"Season 26", bookPoint:0.56, crownPoint:5.6},
+    {name:"Season 27", bookPoint:0.224, crownPoint:2.24}
+  ];
+
+  const gm1Costs = [5,20,100,500,2500,12500,62500,312500,1562500,7812500];
+  const gm2Book  = [10,40,200,1000,5000,25000,125000,625000,3125000,15625000];
+  const gm2Crown = [5,20,100,500,2500,12500,62500,312500,1562500,78125000];
+
+  // DOM refs
+  const seasonSel = document.getElementById('seasonSelect');
+  const inBooks = document.getElementById('inBooks');
+  const inCrowns = document.getElementById('inCrowns');
+  const troopInputs = Array.from(document.querySelectorAll('.troop-input'));
+  const totalDisplay = document.getElementById('totalDisplay');
+
+  // populate seasons
+  if(seasonSel){
+    seasons.forEach((s,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=s.name; seasonSel.appendChild(op); });
+    seasonSel.selectedIndex = 0;
+    seasonSel.addEventListener('change', ()=>{ updateSeasonDisplay(); calcAll(); });
+  }
+  function updateSeasonDisplay(){ const s = seasons[seasonSel.value||0]; document.getElementById('spBook').textContent = s.bookPoint; document.getElementById('spCrown').textContent = s.crownPoint; }
+  updateSeasonDisplay();
+
+  // recalc on input
+  document.body.addEventListener('input', calcAll);
+
+  function calcAll(){
+    const season = seasons[parseInt(seasonSel.value||0) || 0];
+    let books = Math.max(0, Math.floor(Number(inBooks.value) || 0));
+    let crowns = Math.max(0, Math.floor(Number(inCrowns.value) || 0));
+
+    let usedGM1Books = 0; let usedGM2Books = 0; let usedGM2Crowns = 0;
+
+    const gm1Done = Array.from(document.querySelectorAll('.gm1Done')).map(i=>{ let v = Math.floor(Number(i.value)||0); if(v<0)v=0; if(v>48)v=48; return v; });
+    const gm1Result = Array.from(document.querySelectorAll('.gm1Result'));
+    let totalGM1Up = 0;
+    for(let t=0;t<10;t++){
+      const remain = 48 - (gm1Done[t]||0);
+      if(remain<=0){ if(gm1Result[t]) gm1Result[t].textContent = 0; continue; }
+      const cost = gm1Costs[t]||1;
+      const maxByBooks = Math.floor(books/cost);
+      const up = Math.max(0, Math.min(remain, maxByBooks));
+      books -= up*cost; usedGM1Books += up*cost; totalGM1Up += up;
+      if(gm1Result[t]) gm1Result[t].textContent = up;
+    }
+
+    const gm2Done = Array.from(document.querySelectorAll('.gm2Done')).map(i=>{ let v = Math.floor(Number(i.value)||0); if(v<0)v=0; if(v>6)v=6; return v; });
+    const gm2Result = Array.from(document.querySelectorAll('.gm2Result'));
+    let gm1Pool = totalGM1Up; // 8 GM1 => 1 GM2
+    for(let t=0;t<10;t++){
+      const remain = 6 - (gm2Done[t]||0);
+      if(remain<=0){ if(gm2Result[t]) gm2Result[t].textContent=0; continue; }
+      const maxByGM1 = Math.floor(gm1Pool/8);
+      const maxByBooks = Math.floor(books / (gm2Book[t]||1));
+      const maxByCrowns = Math.floor(crowns / (gm2Crown[t]||1));
+      const up = Math.max(0, Math.min(remain, maxByGM1, maxByBooks, maxByCrowns));
+      if(up>0){ books -= up*(gm2Book[t]||1); crowns -= up*(gm2Crown[t]||1); gm1Pool -= up*8; usedGM2Books += up*(gm2Book[t]||1); usedGM2Crowns += up*(gm2Crown[t]||1); }
+      if(gm2Result[t]) gm2Result[t].textContent = up;
+    }
+
+    const troopPoints = troopInputs.reduce((s,el,idx)=> s + (Math.floor(Number(el.value)||0) * [800,4000,20000,100000][idx]), 0);
+    const pointGM1 = usedGM1Books * season.bookPoint;
+    const pointGM2 = usedGM2Books * season.bookPoint + usedGM2Crowns * season.crownPoint;
+    const totalPoints = pointGM1 + pointGM2 + troopPoints;
+    if(totalDisplay) totalDisplay.textContent = `Tổng điểm: ${Number(totalPoints).toLocaleString('vi-VN')}`;
+
+    // Save totalPoints to Firestore (if logged in) and also autosave inputs (handled separately)
+    saveTotalPointsToFirestore(totalPoints).catch(e=>console.error("saveTotalPoints error", e));
+  }
+
+  // initial calc
+  calcAll();
+
+  // --- Add-only calculator (created on demand) ---
+  let calcElement = null; // single instance
+  let calculatorState = { expr: '' , targetInput: null };
+
+  function createCalculator(){
+    if(calcElement) return calcElement;
+    const el = document.createElement('div');
+    el.className = 'calc-popup';
+    el.setAttribute('aria-hidden','true');
+    el.innerHTML =
+      '<button class=\"calc-close\" title=\"Đóng\">×</button>' +
+      '<div class=\"calc-display\" id=\"__calc_display\">0</div>' +
+      '<div class=\"calc-grid\">' +
+        '<button data-d>7</button><button data-d>8</button><button data-d>9</button>' +
+        '<button data-d>4</button><button data-d>5</button><button data-d>6</button>' +
+        '<button data-d>1</button><button data-d>2</button><button data-d>3</button>' +
+        '<button data-d>0</button><button id=\"__calc_plus\">+</button><button id=\"__calc_eq\">=</button>' +
+      '</div>' +
+      '<div style=\"margin-top:8px\"><button id=\"__calc_back\" style=\"width:100%;\">Backspace</button></div>';
+    document.body.appendChild(el);
+
+    const disp = el.querySelector('#__calc_display');
+    const back = el.querySelector('#__calc_back');
+    const plus = el.querySelector('#__calc_plus');
+    const eq = el.querySelector('#__calc_eq');
+    const digits = Array.from(el.querySelectorAll('[data-d]'));
+    const closeBtn = el.querySelector('.calc-close');
+
+    function render(){ disp.textContent = calculatorState.expr || '0'; }
+
+    digits.forEach(btn=> btn.addEventListener('click', ()=>{ calculatorState.expr += btn.textContent; render(); }));
+
+    plus.addEventListener('click', ()=>{ if(calculatorState.expr === '') return; if(calculatorState.expr.slice(-1) === '+') return; calculatorState.expr += '+'; render(); });
+
+    back.addEventListener('click', ()=>{ calculatorState.expr = calculatorState.expr.slice(0,-1); render(); });
+
+    eq.addEventListener('click', ()=>{ 
+      let sum = 0;
+      if(calculatorState.expr !== ''){
+        const parts = calculatorState.expr.split('+').filter(p=>p!=='');
+        for(const p of parts){ const n = parseInt(p,10); if(!isNaN(n)) sum += n; }
+      }
+      if(calculatorState.targetInput) calculatorState.targetInput.value = sum;
+      if(calculatorState.targetInput) calculatorState.targetInput.dispatchEvent(new Event('input'));
+      hideCalculator();
+    });
+
+    closeBtn.addEventListener('click', ()=>{ hideCalculator(); });
+
+    calcElement = el;
+    return el;
+  }
+
+  function showCalculatorFor(input){
+    if(!input) return;
+    const el = createCalculator();
+    calculatorState.expr = (input.value && !isNaN(Number(input.value))) ? String(Number(input.value)) : '';
+    calculatorState.targetInput = input;
+    const rect = input.getBoundingClientRect();
+    const left = rect.right + 8 + window.scrollX;
+    const top = rect.top + window.scrollY;
+    el.style.left = left + 'px';
+    el.style.top = top + 'px';
+    el.style.display = 'block';
+    el.setAttribute('aria-hidden','false');
+    el.querySelector('#__calc_display').textContent = calculatorState.expr || '0';
+  }
+
+  function hideCalculator(){
+    if(!calcElement) return;
+    calcElement.style.display = 'none';
+    calculatorState.expr = '';
+    calculatorState.targetInput = null;
+  }
+
+  // create on focus for each troop input
+  document.querySelectorAll('.troop-input').forEach(inp=>{
+    inp.addEventListener('focus', (e)=>{
+      showCalculatorFor(e.target);
+    });
+  });
+
+  // click outside to hide and apply
+  document.addEventListener('mousedown', (ev)=>{
+    if(!calcElement) return;
+    const el = calcElement;
+    if(el.style.display !== 'block') return;
+    if(el.contains(ev.target)) return;
+    if(ev.target.classList && ev.target.classList.contains('troop-input')) return;
+    // apply: evaluate and set
+    let sum = 0;
+    if(calculatorState.expr !== ''){
+      const parts = calculatorState.expr.split('+').filter(p=>p!=='');
+      for(const p of parts){ const n = parseInt(p,10); if(!isNaN(n)) sum += n; }
+    }
+    if(calculatorState.targetInput) calculatorState.targetInput.value = sum;
+    if(calculatorState.targetInput) calculatorState.targetInput.dispatchEvent(new Event('input'));
+    hideCalculator();
+  });
+
+  // ---- Firestore autosave & load integration ----
+
+  let currentUID = null;
+  let saveTimer = null;
+
+  // helper to read inputs into an object
+  function readAllInputs(){
+    const gm1Done = Array.from(document.querySelectorAll('.gm1Done')).map(i=>{ let v = Math.floor(Number(i.value)||0); if(v<0)v=0; if(v>48)v=48; return v; });
+    const gm2Done = Array.from(document.querySelectorAll('.gm2Done')).map(i=>{ let v = Math.floor(Number(i.value)||0); if(v<0)v=0; if(v>6)v=6; return v; });
+    const inputs = {
+      season: Number(seasonSel.value||0),
+      inBooks: Math.max(0, Math.floor(Number(inBooks.value)||0)),
+      inCrowns: Math.max(0, Math.floor(Number(inCrowns.value)||0)),
+      t1: Math.max(0, Math.floor(Number(document.getElementById('t1').value)||0)),
+      t2: Math.max(0, Math.floor(Number(document.getElementById('t2').value)||0)),
+      t3: Math.max(0, Math.floor(Number(document.getElementById('t3').value)||0)),
+      t4: Math.max(0, Math.floor(Number(document.getElementById('t4').value)||0)),
+      gm1Done,
+      gm2Done
+    };
+    return inputs;
+  }
+
+  async function saveInputsToFirestoreDebounced(){
+    if (!currentUID) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(async ()=>{
+      try {
+        const accRef = doc(db, "accounts", currentUID);
+        const payload = { tabsData: { barracks: { inputs: readAllInputs(), updatedAt: serverTimestamp() } } };
+        await setDoc(accRef, payload, { merge: true });
+        // console.log("Barracks inputs saved");
+      } catch(e){
+        console.error("saveInputs failed", e);
+      }
+    }, 700);
+  }
+
+  // hook inputs to autosave
+  document.querySelectorAll('input').forEach(el => {
+    el.addEventListener('input', saveInputsToFirestoreDebounced);
+  });
+
+  // save totalPoints (no debounce needed; called from calcAll)
+  async function saveTotalPointsToFirestore(totalPoints){
+    if (!currentUID) return;
+    try {
+      const accRef = doc(db, "accounts", currentUID);
+      const payload = { tabsData: { barracks: { totalPoints: Number(totalPoints), updatedAt: serverTimestamp() } } };
+      await setDoc(accRef, payload, { merge: true });
+      // console.log("totalPoints saved:", totalPoints);
+    } catch(e){
+      console.error("saveTotalPointsToFirestore", e);
+    }
+  }
+
+  // load saved inputs when user logs in
+  async function loadBarracksDataForUID(uid){
+    try {
+      const accRef = doc(db, "accounts", uid);
+      const snap = await getDoc(accRef);
+      if (!snap.exists()) return;
+      const data = snap.data();
+      const saved = data?.tabsData?.barracks;
+      if (!saved) return;
+      const inputs = saved.inputs;
+      if (inputs) {
+        seasonSel.value = inputs.season ?? seasonSel.value;
+        inBooks.value = inputs.inBooks ?? inBooks.value;
+        inCrowns.value = inputs.inCrowns ?? inCrowns.value;
+        document.getElementById('t1').value = inputs.t1 ?? document.getElementById('t1').value;
+        document.getElementById('t2').value = inputs.t2 ?? document.getElementById('t2').value;
+        document.getElementById('t3').value = inputs.t3 ?? document.getElementById('t3').value;
+        document.getElementById('t4').value = inputs.t4 ?? document.getElementById('t4').value;
+        // gm1Done/gm2Done arrays
+        if (Array.isArray(inputs.gm1Done)) {
+          const els = document.querySelectorAll('.gm1Done');
+          inputs.gm1Done.forEach((v,i)=>{ if(els[i]) els[i].value = v; });
+        }
+        if (Array.isArray(inputs.gm2Done)) {
+          const els2 = document.querySelectorAll('.gm2Done');
+          inputs.gm2Done.forEach((v,i)=>{ if(els2[i]) els2[i].value = v; });
+        }
+      }
+      // load totalPoints if exists (display only)
+      const tp = saved?.totalPoints;
+      if (tp !== undefined && tp !== null) {
+        if(totalDisplay) totalDisplay.textContent = `Tổng điểm: ${Number(tp).toLocaleString('vi-VN')}`;
+      }
+      // recalc UI after loading
+      updateSeasonDisplay();
+      calcAll();
+    } catch(e){
+      console.error("loadBarracksDataForUID error", e);
+    }
+  }
+
+  // Auth handling
+  function promptSignIn(){
+    return signInWithPopup(auth, provider);
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    const status = document.getElementById('authStatus');
+    if (!user) {
+      currentUID = null;
+      status.innerHTML = `<button class="btn" onclick="promptSignIn()">Đăng nhập</button> — đăng nhập để lưu & tải dữ liệu tài khoản.`;
+      // still run local behavior
+      return;
+    }
+    currentUID = user.uid;
+    status.innerText = `Đã đăng nhập: ${user.email} (UID: ${currentUID}) — dữ liệu Barracks sẽ được tải tự động.`;
+    // ensure account doc exists and load
+    try {
+      const accRef = doc(db, "accounts", currentUID);
+      const accSnap = await getDoc(accRef);
+      if (!accSnap.exists()) {
+        await setDoc(accRef, { email: user.email || null, createdAt: serverTimestamp(), tabsData: { barracks: { inputs: readAllInputs(), totalPoints: 0 } } }, { merge: true });
+      }
+    } catch(e){
+      console.error("ensure account doc failed", e);
+    }
+    await loadBarracksDataForUID(currentUID);
+  });
+
+  // expose promptSignIn to global so inline onclick can call
+  window.promptSignIn = promptSignIn;
+
+})(); // end IIFE
+</script>
+</body>
+</html>
