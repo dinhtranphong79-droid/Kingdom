@@ -421,7 +421,7 @@ onAuthStateChanged(auth, async (user) => {
   if (!user) {
     currentUID = null;
     currentEmail = null;
-    status.innerHTML = `<button class="btn" onclick="promptSignIn()">Đăng nhập Google</button> — đăng nhập để lưu & tải dữ liệu tài khoản.`;
+    status.innerHTML = `<button class="btn" onclick="promptSignIn()">Đăng nhập</button> — đăng nhập để lưu & tải dữ liệu tài khoản.`;
     // still load local state so UI works offline
     loadStateLocal();
     renderTabs(); renderHeroList(); renderSummary();
