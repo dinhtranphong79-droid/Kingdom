@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Khác</title>
+
+  <style>
+    :root{
+      --bg:#f6f8fb; --card:#fff; --accent:#2563eb; --muted:#6b7280;
+    }
+    *{box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif}
+    body{margin:0;min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px;}
+    .wrap{width:100%;max-width:640px;background:var(--card);border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.08);padding:22px;}
+    h1{margin:0 0 6px;font-size:20px;}
+    .row{display:flex;gap:12px;margin-bottom:12px;}
+    label{font-size:13px;color:var(--muted);margin-bottom:6px;display:block;}
+    input[type="number"]{width:100%;padding:10px;border-radius:10px;border:1px solid #e6eef8;font-size:16px;}
+    .controls{display:flex;gap:10px;margin-top:6px;align-items:center;}
+    button.btn{background:var(--accent);color:#fff;font-weight:600;border:none;padding:10px 14px;border-radius:10px;cursor:pointer}
+    button.clear{background:transparent;border:1px solid #e6eef8;color:var(--muted);padding:8px 12px;border-radius:10px;cursor:pointer}
+    .result-card{margin-top:18px;padding:14px;border-radius:10px;border:1px solid #e9f0ff;background:#fdfdfd}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;font-size:14px}
+    th{color:var(--muted);border-bottom:1px dashed #e6eef8}
+    td.value{text-align:right;font-weight:700}
+    tr.total td{border-top:2px solid #e6eef8;background:#fff;}
+    #authStatus{margin-bottom:12px;padding:10px;background:#fff7ed;border:1px solid #facc15;border-radius:8px;font-size:14px}
+  </style>
+</head>
+
+<body>
+<div class="wrap">
+  <h1>Khác</h1>
+
+  <div id="authStatus">Đang kiểm tra đăng nhập…</div>
+
+  <div class="row">
+    <div style="flex:1">
+      <label>Búa</label>
+      <input id="hammers" type="number" min="0" value="0">
+    </div>
+    <div style="flex:1">
+      <label>Jennifer</label>
+      <input id="jennifers" type="number" min="0" value="0">
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="calcBtn">Tính</button>
+    <button class="clear" id="clearBtn">Đặt lại</button>
+  </div>
+
+  <div class="result-card" id="result" style="display:none">
+    <table>
+      <tr><th>Loại</th><th class="value">Số lượng</th><th class="value">Điểm</th><th class="value">Tổng</th></tr>
+      <tr>
+        <td>Búa</td>
+        <td class="value" id="outH">0</td>
+        <td class="value">100</td>
+        <td class="value" id="outHP">0</td>
+      </tr>
+      <tr>
+        <td>Jennifer</td>
+        <td class="value" id="outJ">0</td>
+        <td class="value">1000</td>
+        <td class="value" id="outJP">0</td>
+      </tr>
+      <tr class="total">
+        <td><strong>Tổng</strong></td>
+        <td></td><td></td>
+        <td class="value" id="outTotal">0</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<script type="module">
+/* ---------------- Firebase ---------------- */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+/* --- CONFIG (thay bằng của bạn) --- */
+const firebaseConfig = {
+  apiKey: "YOUR_APIKEY",
+  authDomain: "YOUR_AUTHDOMAIN",
+  projectId: "YOUR_PROJECTID",
+  storageBucket: "YOUR_STORAGEBUCKET",
+  messagingSenderId: "YOUR_SENDERID",
+  appId: "YOUR_APPID"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+const db = getFirestore(app);
+
+/* ---------------- DOM ---------------- */
+const el = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString("vi-VN");
+
+const inpH = el("hammers");
+const inpJ = el("jennifers");
+const outH = el("outH");
+const outJ = el("outJ");
+const outHP = el("outHP");
+const outJP = el("outJP");
+const outTotal = el("outTotal");
+const resultCard = el("result");
+const statusBar = el("authStatus");
+
+/* ---------------- Tính điểm ---------------- */
+function compute(){
+  const h = Math.max(0, Number(inpH.value)||0);
+  const j = Math.max(0, Number(inpJ.value)||0);
+
+  const pH = h * 100;
+  const pJ = j * 1000;
+  const total = pH + pJ;
+
+  outH.textContent = fmt(h);
+  outJ.textContent = fmt(j);
+  outHP.textContent = fmt(pH);
+  outJP.textContent = fmt(pJ);
+  outTotal.textContent = fmt(total);
+
+  resultCard.style.display = "block";
+
+  // lưu totalPoints
+  if (currentUID) {
+    saveTotalPoints(total);
+  }
+}
+
+el("calcBtn").onclick = compute;
+
+el("clearBtn").onclick = () => {
+  inpH.value = 0;
+  inpJ.value = 0;
+  resultCard.style.display = "none";
+  scheduleAutosave();
+};
+
+/* ---------------- Autosave Firestore ---------------- */
+let currentUID = null;
+let autosaveTimer = null;
+
+function gatherInputs(){
+  return {
+    hammers: Number(inpH.value)||0,
+    jennifers: Number(inpJ.value)||0
+  };
+}
+
+function scheduleAutosave(){
+  if (!currentUID) return;
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+
+  autosaveTimer = setTimeout(async ()=>{
+    const ref = doc(db, "accounts", currentUID, "tabsData", "other");
+    await setDoc(ref, {
+      inputs: gatherInputs(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }, 700);
+}
+
+inpH.addEventListener("input", scheduleAutosave);
+inpJ.addEventListener("input", scheduleAutosave);
+
+/* ---------------- Save totalPoints ---------------- */
+async function saveTotalPoints(total){
+  const ref = doc(db, "accounts", currentUID, "tabsData", "other");
+  await setDoc(ref, {
+    totalPoints: Number(total),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+}
+
+/* ---------------- Load Firestore ---------------- */
+async function loadData(uid){
+  const ref = doc(db, "accounts", uid, "tabsData", "other");
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+
+  const d = snap.data();
+  if (d.inputs){
+    inpH.value = d.inputs.hammers ?? 0;
+    inpJ.value = d.inputs.jennifers ?? 0;
+  }
+
+  if (d.totalPoints !== undefined){
+    resultCard.style.display = "block";
+    outTotal.textContent = fmt(d.totalPoints);
+  }
+}
+
+/* ---------------- Auth ---------------- */
+function signIn(){
+  return signInWithPopup(auth, provider);
+}
+window.signIn = signIn;
+
+onAuthStateChanged(auth, async user => {
+  if (!user){
+    currentUID = null;
+    statusBar.innerHTML = `<button onclick="signIn()">Đăng nhập</button>`;
+    return;
+  }
+
+  currentUID = user.uid;
+  statusBar.textContent = `Đã đăng nhập: ${user.email}`;
+
+  await loadData(currentUID);
+
+  // tạo doc nếu chưa có
+  const baseRef = doc(db, "accounts", currentUID, "tabsData", "other");
+  const snap = await getDoc(baseRef);
+  if (!snap.exists()){
+    await setDoc(baseRef, { inputs: gatherInputs(), totalPoints: 0 }, { merge: true });
+  }
+});
+</script>
+
+</body>
+</html>
