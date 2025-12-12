@@ -84,8 +84,8 @@
     border:none;
   }
 </style>
-
 </head>
+
 <body>
 
 <!-- SIDEBAR -->
@@ -111,6 +111,9 @@
   <iframe id="frame" src="tongdiem.html"></iframe>
 </div>
 
+<!-- Firebase core init -->
+<script type="module" src="firebase-init.js"></script>
+
 <script>
   const sidebar = document.getElementById("sidebar");
   const frame = document.getElementById("frame");
@@ -123,6 +126,9 @@
     frame.src = file;
     sidebar.classList.remove("show");
   }
+
+  // expose login để iframe gọi: window.parent.signIn()
+  window.openTab = openTab;
 </script>
 
 </body>
