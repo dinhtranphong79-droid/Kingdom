@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Tài khoản</title>
+
+<style>
+  :root{
+    --bg:#f5f7fb;
+    --card:#ffffff;
+    --accent:#2563eb;
+    --muted:#6b7280;
+  }
+  *{box-sizing:border-box;font-family:Inter,Arial,sans-serif;}
+
+  body{
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    display:flex;
+    justify-content:center;
+  }
+  .wrap{
+    width:100%;
+    max-width:800px;
+    background:var(--card);
+    padding:20px;
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.06);
+  }
+  h1{margin-top:0;font-size:22px;}
+
+  .status{
+    padding:10px 12px;
+    background:#eef4ff;
+    border-radius:10px;
+    margin-bottom:20px;
+    font-size:14px;
+    color:#333;
+  }
+  button{
+    padding:8px 14px;
+    border:none;
+    background:var(--accent);
+    color:white;
+    border-radius:8px;
+    cursor:pointer;
+    margin:5px 0;
+    font-weight:600;
+  }
+  .acc-list{
+    margin-top:20px;
+  }
+  .acc{
+    padding:12px;
+    background:#f8fafc;
+    border-radius:10px;
+    margin-bottom:10px;
+    cursor:pointer;
+    transition:0.25s;
+    border:1px solid #e5e7eb;
+  }
+  .acc:hover{
+    background:#e2e8f0;
+  }
+  .acc-title{
+    font-size:16px;
+    font-weight:700;
+    margin-bottom:5px;
+  }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <h1>Tài khoản</h1>
+
+  <div id="authStatus" class="status">Đang kiểm tra đăng nhập…</div>
+
+  <button onclick="signIn()">Đăng nhập Google</button>
+  <button style="background:#ef4444" onclick="signOutNow()">Đăng xuất</button>
+
+  <h2 style="margin-top:25px;font-size:18px;">Danh sách 9 tài khoản Dolvar</h2>
+
+  <div class="acc-list" id="accList"></div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getAuth, GoogleAuthProvider, signInWithPopup,
+  onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+
+// ---------- Firebase Config (bạn tự thay) ----------
+const firebaseConfig = {
+  apiKey: "YOURKEY",
+  authDomain: "YOURAUTH",
+  projectId: "YOURPROJECT",
+  storageBucket: "YOURBUCKET",
+  messagingSenderId: "YOURMSG",
+  appId: "YOURAPP"
+};
+// ---------------------------------------------------
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+// ---------- 9 Account Cố định ----------
+const ACCOUNTS = [
+  "minhlanne@dolvar.app",
+  "minhlannho@dolvar.app",
+  "dolvar@dolvar.app",
+  "dolvarash@dolvar.app",
+  "dolvaraegis@dolvar.app",
+  "dolvarreign@dolvar.app",
+  "dolvarreaper@dolvar.app",
+  "dolvartroth@dolvar.app",
+  "dolvarbastion@dolvar.app"
+];
+
+// render danh sách account
+const accList = document.getElementById("accList");
+ACCOUNTS.forEach(email=>{
+  const div = document.createElement("div");
+  div.className = "acc";
+  div.innerHTML = `
+    <div class="acc-title">${email}</div>
+    <div class="acc-info" style="font-size:13px;color:#555;">
+      Tài khoản Dolvar cố định — dữ liệu riêng biệt trong Firestore.
+    </div>
+  `;
+  accList.appendChild(div);
+});
+
+// ---------- ACTION ----------
+window.signIn = async function(){
+  await signInWithPopup(auth, provider);
+}
+
+window.signOutNow = async function(){
+  await signOut(auth);
+}
+
+// ---------- AUTH LISTENER ----------
+onAuthStateChanged(auth, user=>{
+  const status = document.getElementById("authStatus");
+
+  if(!user){
+    status.innerHTML = `Chưa đăng nhập`;
+    return;
+  }
+
+  status.innerHTML = `
+    <b>Đã đăng nhập:</b> ${user.email}<br>
+    UID: ${user.uid}
+  `;
+});
+</script>
+
+</body>
+</html>
