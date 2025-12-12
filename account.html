@@ -88,29 +88,22 @@
 
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getAuth, GoogleAuthProvider, signInWithPopup,
-  onAuthStateChanged, signOut
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+<script>
+/* ==========================================================
+   LẤY FIREBASE TỪ INDEX.HTML
+   ========================================================== */
+const FB = window.parent.__FB;
+if (!FB) {
+  document.getElementById("authStatus").innerHTML =
+    "Lỗi: không nhận được Firebase từ hệ thống!";
+}
+const auth = FB?.auth || null;
+const db   = FB?.db   || null;
+const provider = FB?.provider || null;
 
-// ---------- Firebase Config (bạn tự thay) ----------
-const firebaseConfig = {
-  apiKey: "YOURKEY",
-  authDomain: "YOURAUTH",
-  projectId: "YOURPROJECT",
-  storageBucket: "YOURBUCKET",
-  messagingSenderId: "YOURMSG",
-  appId: "YOURAPP"
-};
-// ---------------------------------------------------
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
-
-// ---------- 9 Account Cố định ----------
+/* ==========================================================
+   DANH SÁCH 9 ACCOUNT DOLVAR
+   ========================================================== */
 const ACCOUNTS = [
   "minhlanne@dolvar.app",
   "minhlannho@dolvar.app",
@@ -123,7 +116,6 @@ const ACCOUNTS = [
   "dolvarbastion@dolvar.app"
 ];
 
-// render danh sách account
 const accList = document.getElementById("accList");
 ACCOUNTS.forEach(email=>{
   const div = document.createElement("div");
@@ -131,35 +123,49 @@ ACCOUNTS.forEach(email=>{
   div.innerHTML = `
     <div class="acc-title">${email}</div>
     <div class="acc-info" style="font-size:13px;color:#555;">
-      Tài khoản Dolvar cố định — dữ liệu riêng biệt trong Firestore.
+      Tài khoản Dolvar cố định — lưu dữ liệu riêng trong Firestore.
     </div>
   `;
   accList.appendChild(div);
 });
 
-// ---------- ACTION ----------
-window.signIn = async function(){
-  await signInWithPopup(auth, provider);
-}
-
-window.signOutNow = async function(){
-  await signOut(auth);
-}
-
-// ---------- AUTH LISTENER ----------
-onAuthStateChanged(auth, user=>{
-  const status = document.getElementById("authStatus");
-
-  if(!user){
-    status.innerHTML = `Chưa đăng nhập`;
+/* ==========================================================
+   ACTION
+   ========================================================== */
+window.signIn = function(){
+  if (!auth || !provider){
+    alert("Firebase chưa được tải từ index.html!");
     return;
   }
+  auth.signInWithPopup(provider).catch(console.error);
+};
 
-  status.innerHTML = `
-    <b>Đã đăng nhập:</b> ${user.email}<br>
-    UID: ${user.uid}
-  `;
-});
+window.signOutNow = function(){
+  if (!auth){
+    alert("Firebase chưa sẵn sàng!");
+    return;
+  }
+  auth.signOut();
+};
+
+/* ==========================================================
+   AUTH LISTENER
+   ========================================================== */
+if (auth){
+  auth.onAuthStateChanged(user=>{
+    const status = document.getElementById("authStatus");
+
+    if (!user){
+      status.innerHTML = `Chưa đăng nhập`;
+      return;
+    }
+
+    status.innerHTML = `
+      <b>Đã đăng nhập:</b> ${user.email}<br>
+      UID: ${user.uid}
+    `;
+  });
+}
 </script>
 
 </body>
