@@ -120,7 +120,7 @@ $('btnCompute').onclick=async()=>{
   let t=$('targetLevel').value;
   let lv=t?Number(t):computeMax(S,W,Q,B);
   outputEl.style.display="block";
-  outputEl.innerHTML=`<b>Cấp đạt:</b> ${lv}<br><b>Điểm:</b> ${lv*556}`;
+  outputEl.innerHTML=`<b>Cấp đạt:</b> ${lv}<br><b>Điểm:</b> ${lv*556000}`;
   if(uid) await deduct(lv);
 };
 
