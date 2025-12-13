@@ -3,136 +3,428 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Rồng</title>
-
+<title>Rồng</title> 
 <style>
-:root{--bg:#f5f7fb;--card:#fff;--accent:#0f62fe;--muted:#6b7280}
-*{box-sizing:border-box;font-family:Inter,Arial,sans-serif}
-body{margin:0;background:var(--bg);padding:28px;display:flex;justify-content:center}
-.wrap{width:100%;max-width:980px;background:#fff;border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(2,6,23,.08)}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-.card{background:#f8fbff;border-radius:10px;padding:12px;border:1px solid #e6f0ff}
-label{font-size:13px;color:var(--muted)}
-input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid #e6eef8}
-.controls{display:flex;gap:10px;margin-top:12px}
-button{background:var(--accent);color:#fff;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
-.secondary{background:#fff;color:#000;border:1px solid #ddd}
-.result{margin-top:14px}
-.small{font-size:13px;color:var(--muted)}
-table{width:100%;border-collapse:collapse}
-td,th{padding:6px 8px;font-size:14px}
-.right{text-align:right;font-weight:700}
+  :root{
+    --bg:#f5f7fb; --card:#fff; --accent:#0f62fe; --muted:#6b7280;
+  }
+  *{box-sizing:border-box;font-family:Inter,system-ui,Arial,sans-serif}
+  body{margin:0;min-height:100vh;background:var(--bg);display:flex;align-items:flex-start;justify-content:center;padding:28px;}
+  .wrap{width:100%;max-width:980px;background:var(--card);border-radius:12px;padding:18px 20px;box-shadow:0 12px 40px rgba(2,6,23,0.08)}
+  h1{margin:0;font-size:18px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .card{background:#f8fbff;border-radius:10px;padding:12px;border:1px solid #e6f0ff}
+  label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type="number"]{width:100%;padding:8px 10px;border-radius:8px;border:1px solid #e6eef8;font-size:15px}
+  .controls{display:flex;gap:10px;align-items:center;margin-top:12px}
+  button.btn{background:var(--accent);color:white;border:none;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+  button.secondary{background:transparent;border:1px solid #e6eef8;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .result{margin-top:14px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:8px 10px;text-align:left;font-size:14px}
+  th{color:var(--muted);font-weight:700;border-bottom:1px dashed #e6eef8}
+  td.right{text-align:right;font-weight:700}
+  .small{font-size:13px;color:var(--muted)}
+  .summary{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap}
+  .box{flex:1;min-width:220px;background:#fff;border-radius:10px;padding:10px;border:1px solid #eef6ff}
 </style>
-</head>
 
-<body>
-<div class="wrap">
-<h1>Rồng</h1>
-
-<div id="status" class="small">Đang kiểm tra đăng nhập…</div>
-
-<div class="grid">
-  <div class="card">
-    <h3>Tài nguyên</h3>
-    <label>B</label><input id="haveB" type="number" value="0">
-    <label>A</label><input id="haveA" type="number" value="0">
-    <label>SR</label><input id="haveSR" type="number" value="0">
-    <label>SSR</label><input id="haveSSR" type="number" value="0">
-  </div>
-
-  <div class="card">
-    <h3>Level</h3>
-    <label>Đồng</label><input id="lvlDong" type="number" value="0">
-    <label>Bạc</label><input id="lvlBac" type="number" value="0">
-    <label>Vàng</label><input id="lvlVang" type="number" value="0">
-    <label>Truyền Kỳ</label><input id="lvlTK" type="number" value="0">
-    <label>Rồng</label><input id="lvlDragon" type="number" value="0">
-  </div>
-</div>
-
-<div class="controls">
-  <button id="compute">Tính</button>
-  <button id="reset" class="secondary">Reset</button>
-</div>
-
-<div id="resultArea" class="result" style="display:none">
-  <h3>Kết quả</h3>
-  <table>
-    <tr><td>Tổng điểm</td><td class="right" id="ptsTotal"></td></tr>
-  </table>
-</div>
-</div>
-
+<!-- ========================= -->
+<!--      FIREBASE MODULE      -->
+<!-- ========================= -->
 <script type="module">
-/* ================= FIREBASE CHUNG ================= */
-const { auth, db, onAuthStateChanged } = window.__FB;
-import { doc, getDoc, setDoc, serverTimestamp } from
-  "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { 
+  getFirestore, doc, getDoc, setDoc
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* ================= STATE ================= */
-let uid=null,email=null;
-const $=id=>document.getElementById(id);
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
-/* ================= LOAD / SAVE ================= */
-async function loadData(){
-  const ref=doc(db,"accounts",uid,"tabsData","dragon");
-  const snap=await getDoc(ref);
-  if(!snap.exists()) return;
-  const d=snap.data()?.inputs||{};
-  Object.keys(d).forEach(k=>$(k).value=d[k]);
+const firebaseConfig = {
+  apiKey: "AIzaSyDdKe6vnWEbSq5FHz1Y6Pz3QdVjcrrq5CA",
+  authDomain: "dolvar-7cc8e.firebaseapp.com",
+  projectId: "dolvar-7cc8e",
+  storageBucket: "dolvar-7cc8e.firebasestorage.app",
+  messagingSenderId: "284313401192",
+  appId: "1:284313401192:web:0d2c088d37c5fbe8f008dd",
+  measurementId: "G-D6PRWJGLGQ"
+};
+
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth();
+const provider = new GoogleAuthProvider();
+
+let currentUID = null;
+let saveTimeout = null;
+
+/* -------------------------------------
+   SIGN IN – DÙNG CHUNG TOÀN BỘ HỆ THỐNG
+-------------------------------------- */
+async function signIn(){
+  try{
+    await signInWithPopup(auth, provider);
+  }catch(err){
+    console.error("Login error:", err);
+  }
 }
+window.signIn = signIn;
 
-async function autoSave(){
-  if(!uid) return;
-  const payload={
-    inputs:{
-      haveB:+haveB.value||0,
-      haveA:+haveA.value||0,
-      haveSR:+haveSR.value||0,
-      haveSSR:+haveSSR.value||0,
-      lvlDong:+lvlDong.value||0,
-      lvlBac:+lvlBac.value||0,
-      lvlVang:+lvlVang.value||0,
-      lvlTK:+lvlTK.value||0,
-      lvlDragon:+lvlDragon.value||0
+
+/* --------------------------
+   AUTOSAVE (DEBOUNCE 700ms)
+--------------------------- */
+function autoSave(){
+  if (!currentUID) return;
+
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(async ()=>{
+
+    const payload = {
+      inputs: {
+        haveB: Number(haveB.value)||0,
+        haveA: Number(haveA.value)||0,
+        haveSR: Number(haveSR.value)||0,
+        haveSSR: Number(haveSSR.value)||0,
+        lvlDong: Number(lvlDong.value)||0,
+        lvlBac: Number(lvlBac.value)||0,
+        lvlVang: Number(lvlVang.value)||0,
+        lvlTK: Number(lvlTK.value)||0,
+        lvlDragon: Number(lvlDragon.value)||0
+      },
+      updatedAt: new Date()
+    };
+
+    await setDoc(
+      doc(db,"accounts",currentUID,"tabsData","dragon"),
+      payload,
+      { merge: true }
+    );
+
+  },700);
+}
+window.autoSave = autoSave;
+
+
+/* --------------------------
+      AUTOLOAD FROM DB
+--------------------------- */
+async function loadData(uid){
+  const ref = doc(db, "accounts", uid, "tabsData", "dragon");
+  const snap = await getDoc(ref);
+
+  if (snap.exists()){
+    const d = snap.data();
+    if (d.inputs){
+
+      haveB.value = d.inputs.haveB ?? 0;
+      haveA.value = d.inputs.haveA ?? 0;
+      haveSR.value = d.inputs.haveSR ?? 0;
+      haveSSR.value = d.inputs.haveSSR ?? 0;
+
+      lvlDong.value = d.inputs.lvlDong ?? 0;
+      lvlBac.value  = d.inputs.lvlBac ?? 0;
+      lvlVang.value = d.inputs.lvlVang ?? 0;
+      lvlTK.value   = d.inputs.lvlTK ?? 0;
+      lvlDragon.value = d.inputs.lvlDragon ?? 0;
+
+    }
+  }
+}
+window.loadData = loadData;
+
+
+/* --------------------------
+ SAVE TOTAL POINTS AFTER CALC
+--------------------------- */
+async function saveTotalPoints(total){
+  if (!currentUID) return;
+
+  await setDoc(
+    doc(db,"accounts",currentUID,"tabsData","dragon"),
+    {
+      totalPoints: total,
+      updatedAt: new Date()
     },
-    updatedAt:serverTimestamp()
-  };
-  await setDoc(doc(db,"accounts",uid,"tabsData","dragon"),payload,{merge:true});
+    { merge: true }
+  );
 }
+window.saveTotalPoints = saveTotalPoints;
 
-/* ================= AUTH ================= */
-onAuthStateChanged(auth,async user=>{
-  if(!user){
-    status.innerHTML=`<button onclick="window.__FB.signInWithPopup(auth,window.__FB.provider)">Đăng nhập</button>`;
+
+/* --------------------------
+     AUTH STATE
+--------------------------- */
+onAuthStateChanged(auth, async user=>{
+  if (!user){
+    currentUID = null;
     return;
   }
-  uid=user.uid; email=user.email;
-  status.innerHTML=`Đăng nhập: <b>${email}</b>`;
-  await loadData();
+
+  currentUID = user.uid;
+
+  // tạo document nếu chưa có
+  const baseRef = doc(db,"accounts",currentUID,"tabsData","dragon");
+  const snap = await getDoc(baseRef);
+
+  if (!snap.exists()){
+    await setDoc(baseRef,{
+      inputs:{},
+      totalPoints:0,
+      createdAt:new Date()
+    });
+  }
+
+  await loadData(currentUID);
 });
-
-/* ================= TÍNH ĐIỂM ================= */
-function compute(){
-  const total =
-    haveB.value*70 +
-    haveA.value*700 +
-    haveSR.value*7000 +
-    haveSSR.value*14000;
-
-  ptsTotal.textContent = total.toLocaleString("vi-VN");
-  resultArea.style.display="block";
-  autoSave();
-}
-
-/* ================= EVENTS ================= */
-compute.onclick=compute;
-reset.onclick=()=>{
-  document.querySelectorAll("input").forEach(i=>i.value=0);
-  resultArea.style.display="none";
-  autoSave();
-};
-document.querySelectorAll("input").forEach(i=>i.oninput=autoSave);
 </script>
+</head>
+
+
+
+<body>
+  <div class="wrap">
+
+    <h1>Rồng</h1>
+
+    <!-- ====== INPUT UI (GIỮ NGUYÊN) ====== -->
+    <div class="grid">
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:15px">Tài nguyên</h3>
+        <div style="display:grid;gap:8px">
+          <div><label>Phù văn B</label><input id="haveB" type="number" min="0" value="0"></div>
+          <div><label>Phù văn A</label><input id="haveA" type="number" min="0" value="0"></div>
+          <div><label>Phù văn SR</label><input id="haveSR" type="number" min="0" value="0"></div>
+          <div><label>Phù văn SSR</label><input id="haveSSR" type="number" min="0" value="0"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:15px">Level hiện tại</h3>
+        <div style="display:grid;gap:8px">
+          <div><label>Đồng</label><input id="lvlDong" type="number" min="0" value="0"></div>
+          <div><label>Bạc</label><input id="lvlBac" type="number" min="0" value="0"></div>
+          <div><label>Vàng</label><input id="lvlVang" type="number" min="0" value="0"></div>
+          <div><label>Truyền Kỳ</label><input id="lvlTK" type="number" min="0" value="0"></div>
+          <div><label>Level rồng</label><input id="lvlDragon" type="number" min="0" value="0"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="compute" class="btn">Tính tối ưu</button>
+      <button id="reset" class="secondary">Đặt lại</button>
+      <div style="flex:1"></div>
+      <div class="small">Điểm: B=70, A=700, SR=7000, SSR=14000</div>
+    </div>
+
+    <!-- ====== KẾT QUẢ ====== -->
+    <div id="resultArea" class="result" style="display:none">
+
+      <h3>Kết quả</h3>
+
+      <div class="summary">
+
+        <div class="box">
+          <div class="small">Level trước → sau</div>
+          <table>
+            <tr><td>Đồng</td><td class="right" id="startDong"></td><td class="right" id="endDong"></td></tr>
+            <tr><td>Bạc</td><td class="right" id="startBac"></td><td class="right" id="endBac"></td></tr>
+            <tr><td>Vàng</td><td class="right" id="startVang"></td><td class="right" id="endVang"></td></tr>
+            <tr><td>Truyền Kỳ</td><td class="right" id="startTK"></td><td class="right" id="endTK"></td></tr>
+            <tr><td>Level rồng</td><td class="right" id="startDragon"></td><td class="right" id="endDragon"></td></tr>
+          </table>
+        </div>
+
+        <div class="box">
+          <div class="small">Tài nguyên dùng / còn</div>
+          <table>
+            <tr><td>B</td><td class="right" id="usedB"></td><td class="right" id="leftB"></td></tr>
+            <tr><td>A</td><td class="right" id="usedA"></td><td class="right" id="leftA"></td></tr>
+            <tr><td>SR</td><td class="right" id="usedSR"></td><td class="right" id="leftSR"></td></tr>
+            <tr><td>SSR</td><td class="right" id="usedSSR"></td><td class="right" id="leftSSR"></td></tr>
+          </table>
+        </div>
+
+        <div class="box">
+          <div class="small">Điểm</div>
+          <table>
+            <tr><td>B</td><td class="right" id="ptsB"></td></tr>
+            <tr><td>A</td><td class="right" id="ptsA"></td></tr>
+            <tr><td>SR</td><td class="right" id="ptsSR"></td></tr>
+            <tr><td>SSR</td><td class="right" id="ptsSSR"></td></tr>
+            <tr><td><b>Tổng</b></td><td class="right" id="ptsTotal"></td></tr>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ================================
+   LOGIC TÍNH TOÁN GIỮ NGUYÊN 100%
+================================ */
+
+(function(){
+
+  const COST_B  = 250;
+  const COST_A  = 125;
+  const COST_SR = 66;
+
+  const PT_B  = 70;
+  const PT_A  = 700;
+  const PT_SR = 7000;
+  const PT_SSR = 14000;
+
+  const el = id => document.getElementById(id);
+  const parse = inp => Math.max(0, Number(inp.value)||0);
+  const fmt = n => Number(n).toLocaleString("vi-VN");
+
+  function compute(){
+
+    let have = {
+      B: parse(el("haveB")),
+      A: parse(el("haveA")),
+      SR: parse(el("haveSR")),
+      SSR: parse(el("haveSSR"))
+    };
+
+    let st = {
+      dong: parse(el("lvlDong")),
+      bac:  parse(el("lvlBac")),
+      vang: parse(el("lvlVang")),
+      tk:   parse(el("lvlTK")),
+      dragon: parse(el("lvlDragon"))
+    };
+
+    let start = JSON.parse(JSON.stringify(st));
+    let used = {B:0,A:0,SR:0,SSR:0};
+    let gain = {dong:0,bac:0,vang:0,tk:0,dragon:0};
+
+    function promote(){
+      let c=true;
+      while(c){
+        c=false;
+
+        if(st.dong>=5){
+          let x=Math.floor(st.dong/5);
+          st.dong-=x*5; st.bac+=x;
+          c=true;
+        }
+        if(st.bac>=4){
+          let x=Math.floor(st.bac/4);
+          st.bac-=x*4; st.vang+=x;
+          c=true;
+        }
+        if(st.vang>=5){
+          let x=Math.floor(st.vang/5);
+          st.vang-=x*5; st.tk+=x;
+          c=true;
+        }
+      }
+    }
+
+    promote();
+
+    let go=true;
+    while(go){
+      go=false;
+
+      if(have.B>=COST_B){
+        have.B-=COST_B; used.B+=COST_B;
+        st.dong++; gain.dong++; promote();
+        go=true; continue;
+      }
+
+      if(have.A>=COST_A){
+        have.A-=COST_A; used.A+=COST_A;
+        st.bac++; gain.bac++; promote();
+        go=true; continue;
+      }
+
+      if(have.SR>=COST_SR){
+        have.SR-=COST_SR; used.SR+=COST_SR;
+        st.vang++; gain.vang++; promote();
+        go=true; continue;
+      }
+
+      let costSSR = (st.dragon+1)*10;
+      if(have.SSR>=costSSR){
+        have.SSR-=costSSR; used.SSR+=costSSR;
+        st.tk++; gain.tk++;
+
+        st.dragon++; gain.dragon++;
+        promote();
+        go=true; continue;
+      }
+    }
+
+    // Hiển thị kết quả
+    el("resultArea").style.display="block";
+
+    el("startDong").textContent=fmt(start.dong);
+    el("startBac").textContent=fmt(start.bac);
+    el("startVang").textContent=fmt(start.vang);
+    el("startTK").textContent=fmt(start.tk);
+    el("startDragon").textContent=fmt(start.dragon);
+
+    el("endDong").textContent=fmt(start.dong + gain.dong);
+    el("endBac").textContent=fmt(start.bac + gain.bac);
+    el("endVang").textContent=fmt(start.vang + gain.vang);
+    el("endTK").textContent=fmt(start.tk + gain.tk);
+    el("endDragon").textContent=fmt(start.dragon + gain.dragon);
+
+    el("usedB").textContent=fmt(used.B);
+    el("usedA").textContent=fmt(used.A);
+    el("usedSR").textContent=fmt(used.SR);
+    el("usedSSR").textContent=fmt(used.SSR);
+
+    el("leftB").textContent=fmt(have.B);
+    el("leftA").textContent=fmt(have.A);
+    el("leftSR").textContent=fmt(have.SR);
+    el("leftSSR").textContent=fmt(have.SSR);
+
+    el("ptsB").textContent=fmt(used.B*PT_B);
+    el("ptsA").textContent=fmt(used.A*PT_A);
+    el("ptsSR").textContent=fmt(used.SR*PT_SR);
+    el("ptsSSR").textContent=fmt(used.SSR*PT_SSR);
+
+    let totalPoints =
+      used.B*PT_B + used.A*PT_A + used.SR*PT_SR + used.SSR*PT_SSR;
+
+    el("ptsTotal").textContent = fmt(totalPoints);
+
+    // Lưu sang Firestore
+    if (window.saveTotalPoints) saveTotalPoints(totalPoints);
+  }
+
+
+  el("compute").onclick = compute;
+
+  el("reset").onclick = function(){
+    ["haveB","haveA","haveSR","haveSSR","lvlDong","lvlBac","lvlVang","lvlTK","lvlDragon"]
+      .forEach(id=>el(id).value=0);
+    el("resultArea").style.display="none";
+    if (window.autoSave) autoSave();
+  };
+
+
+  // AUTOSAVE khi nhập
+  [
+    "haveB","haveA","haveSR","haveSSR",
+    "lvlDong","lvlBac","lvlVang","lvlTK","lvlDragon"
+  ].forEach(id=>{
+    document.getElementById(id).addEventListener("input", ()=> {
+      if (window.autoSave) autoSave();
+    });
+  });
+
+})();
+</script>
+
 </body>
 </html>
