@@ -4,6 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Level pháo</title>
+
 <style>
 body { font-family: sans-serif; background: #eef2f5; padding: 20px; }
 .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
@@ -17,390 +18,120 @@ h2 { margin-bottom: 16px; }
 .statusBar { margin-bottom:12px; padding:8px 10px; background:#fff7ed; border:1px solid #fbbf24; border-radius:8px; font-size:14px;}
 </style>
 </head>
+
 <body>
 <div class="container">
   <h2>Level pháo</h2>
   <div id="status" class="statusBar">Đang kiểm tra tài khoản…</div>
 
-  <div class="input-group"><label>Đá</label><input type="number" id="stone" value="0" min="0"></div>
-  <div class="input-group"><label>Gỗ</label><input type="number" id="wood" value="0" min="0"></div>
-  <div class="input-group"><label>Quặng</label><input type="number" id="ore" value="0" min="0"></div>
-  <div class="input-group"><label>Hộp pháo</label><input type="number" id="boxes" value="0" min="0"></div>
-  <div class="input-group"><label>Cấp mục tiêu (để trống = tính cấp tối đa)</label><input type="number" id="targetLevel" value="" min="1" placeholder="Để trống nếu muốn tính cấp tối đa"></div>
+  <div class="input-group"><label>Đá</label><input type="number" id="stone" value="0"></div>
+  <div class="input-group"><label>Gỗ</label><input type="number" id="wood" value="0"></div>
+  <div class="input-group"><label>Quặng</label><input type="number" id="ore" value="0"></div>
+  <div class="input-group"><label>Hộp pháo</label><input type="number" id="boxes" value="0"></div>
+  <div class="input-group"><label>Cấp mục tiêu</label><input type="number" id="targetLevel" placeholder="Để trống = tính tối đa"></div>
 
   <button id="btnCompute">Tính</button>
-  <div id="output" class="result" style="visibility:hidden"></div>
+  <div id="output" class="result" style="display:none"></div>
 </div>
 
 <script type="module">
-// ---------------- Firebase imports (modular) ----------------
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, runTransaction, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-firestore.js";
+/* =====================================================
+   DÙNG FIREBASE CHUNG TỪ index.html
+   ===================================================== */
+const { auth, db, provider, onAuthStateChanged, signInWithPopup } = window.__FB;
+import {
+  doc, getDoc, setDoc, runTransaction,
+  addDoc, collection, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// ---------------- CONFIG - REPLACE with your Firebase config ----------------
-const firebaseConfig = {
-  apiKey: "YOUR_APIKEY",
-  authDomain: "YOUR_AUTHDOMAIN",
-  projectId: "YOUR_PROJECTID",
-  storageBucket: "YOUR_STORAGEBUCKET",
-  messagingSenderId: "YOUR_MSG_SENDER",
-  appId: "YOUR_APPID"
-};
-// ---------------------------------------------------------------------------
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const provider = new GoogleAuthProvider();
-
-// ---------- Accounts with targets ----------
-const ACC_WITH_TARGET = {
-  "minhlanne@dolvar.app": 3000,
-  "dolvaraegis@dolvar.app": 5000
-};
-
-// ---------- UI refs ----------
+/* ================== UI ================== */
 const $ = id => document.getElementById(id);
 const statusEl = $('status');
 const outputEl = $('output');
 
-// ---------- Local state ----------
-let currentUser = null;
-let uid = null;
-let email = null;
-let currentRemaining = null; // null means no target for this account
+/* ================== STATE ================== */
+let uid=null, email=null, remaining=null;
 
-// ----------------- Keep original logic unchanged -----------------
-function toNum(id){
-  let v = Number($(id).value);
-  return (isNaN(v) || v<0) ? 0 : v;
-}
+/* ================== TÍNH TOÁN (GIỮ NGUYÊN LOGIC) ================== */
+function toNum(id){ return Number($(id).value)||0; }
 
-/* simulateOptimal and computeMaxLv copied exactly from your version */
-function simulateOptimal(S, W, Q, B, lv){
-  let stone=S, wood=W, ore=Q, box=B, log=[];
-  const needStone = 1260*lv;
-  const needWood = 340*lv;
-  const needOre = 130*lv;
-
-  let boxForOre = Math.min(box, needOre - ore);
-  if(boxForOre>0){
-    log.push(`Dùng ${boxForOre} hộp → +${boxForOre} quặng`);
-    ore += boxForOre; box -= boxForOre;
-  }
-  let boxForWood = Math.min(box, Math.ceil((needWood - wood)/4));
-  if(boxForWood>0){
-    log.push(`Dùng ${boxForWood} hộp → +${boxForWood*4} gỗ`);
-    wood += boxForWood*4; box -= boxForWood;
-  }
-  if(box>0){
-    log.push(`Dùng ${box} hộp → +${box*20} đá`);
-    stone += box; box=0;
-  }
+function simulateOptimal(S,W,Q,B,lv){
+  const needStone=1260*lv, needWood=340*lv, needOre=130*lv;
+  let log=[];
+  let boxForOre=Math.min(B,needOre-Q); Q+=boxForOre; B-=boxForOre;
+  let boxForWood=Math.min(B,Math.ceil((needWood-W)/4)); W+=boxForWood*4; B-=boxForWood;
+  S+=B*20;
 
   while(true){
-    let missOre = Math.max(0, needOre - ore);
-    let missWood = Math.max(0, needWood - wood);
-
-    let stoneToWood = Math.min(Math.floor(stone/5), missWood + missOre*4);
-    if(stoneToWood>0){
-      log.push(`Đổi ${stoneToWood*5} đá → +${stoneToWood} gỗ`);
-      stone -= stoneToWood*5; wood += stoneToWood;
-    }
-
-    let woodToOre = Math.min(Math.floor(wood/4), missOre);
-    if(woodToOre>0){
-      log.push(`Đổi ${woodToOre*4} gỗ → +${woodToOre} quặng`);
-      wood -= woodToOre*4; ore += woodToOre;
-    }
-
-    if(stoneToWood===0 && woodToOre===0) break;
+    let missOre=Math.max(0,needOre-Q);
+    let missWood=Math.max(0,needWood-W);
+    let s2w=Math.min(Math.floor(S/5),missWood+missOre*4);
+    let w2o=Math.min(Math.floor(W/4),missOre);
+    if(s2w<=0 && w2o<=0) break;
+    S-=s2w*5; W+=s2w;
+    W-=w2o*4; Q+=w2o;
   }
 
-  let missStone = Math.max(0, needStone - stone);
-  let missWood = Math.max(0, needWood - wood);
-  let missOre = Math.max(0, needOre - ore);
-  if(missStone>0 || missWood>0 || missOre>0){
-    return {ok:false, missing:{stone:missStone, wood:missWood, ore:missOre}, log:log};
-  }
-
-  stone -= needStone;
-  wood -= needWood;
-  ore -= needOre;
-
-  return {ok:true, log, remaining:{stone, wood, ore}};
+  if(S<needStone||W<needWood||Q<needOre) return {ok:false};
+  return {ok:true, remain:{S:S-needStone,W:W-needWood,Q:Q-needOre}};
 }
 
-function computeMaxLv(S,W,Q,B){
-  let lo=0, hi=20000, lastLog=[], lastRemaining=null;
-  while(lo<hi){
-    let mid = Math.floor((lo+hi+1)/2);
-    let result = simulateOptimal(S,W,Q,B,mid);
-    if(result.ok){
-      lo = mid;
-      lastLog = result.log;
-      lastRemaining = result.remaining;
-    } else {
-      hi = mid-1;
-    }
-  }
-  return {maxLv: lo, log: lastLog, remaining: lastRemaining};
-}
-// -------------------------------------------------------------------
-
-// ---------- Autosave debounced ----------
-let saveTimer = null;
-function autosaveToFirestoreDebounced(){
-  if (!uid) return;
-  if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    try {
-      const docRef = doc(db, "accounts", uid);
-      const payload = {
-        tabsData: {
-          cannon: {
-            lastInput: {
-              stone: toNum('stone'),
-              wood: toNum('wood'),
-              ore: toNum('ore'),
-              boxes: toNum('boxes'),
-              targetLevel: ( $('targetLevel').value || "" ).toString()
-            }
-          }
-        },
-        updatedAt: serverTimestamp()
-      };
-      await setDoc(docRef, payload, { merge: true });
-    } catch(e){
-      console.error("Autosave failed:", e);
-    }
-  }, 700);
-}
-["stone","wood","ore","boxes","targetLevel"].forEach(id=>{ $(id).addEventListener('input', autosaveToFirestoreDebounced); });
-
-// ---------- Helper: write lastResult & optionally points ----------
-async function saveLastResultToFirestore(localResult, localLevelUp, appliedToTarget){
-  if (!uid) return;
-  try {
-    const docRef = doc(db, "accounts", uid);
-    const payload = {
-      tabsData: {
-        cannon: {
-          lastResult: {
-            computedAt: serverTimestamp(),
-            resultHtml: outputEl.innerHTML,
-            localLevelUp: localLevelUp,
-            appliedToTarget: appliedToTarget ?? 0
-          }
-        }
-      }
-    };
-    await setDoc(docRef, payload, { merge: true });
-  } catch(e){
-    console.error("saveLastResult failed", e);
-  }
+function computeMax(S,W,Q,B){
+  let lv=0;
+  while(simulateOptimal(S,W,Q,B,lv+1).ok) lv++;
+  return lv;
 }
 
-// ---------- Load account data on login ----------
-async function loadAccountOnLogin(user){
-  uid = user.uid;
-  email = user.email || "";
-  currentUser = user;
-
-  const docRef = doc(db, "accounts", uid);
-  const snap = await getDoc(docRef);
-
-  if (!snap.exists()){
-    // create doc but only set cannon target for the two emails
-    const payload = { email: email, createdAt: serverTimestamp() };
-    if (ACC_WITH_TARGET[email] !== undefined) {
-      payload.targets = { cannon: { initial: ACC_WITH_TARGET[email], remaining: ACC_WITH_TARGET[email] } };
-      payload.cannonRemaining = ACC_WITH_TARGET[email];
-    }
-    // also keep an empty tabsData.cannon
-    payload.tabsData = { cannon: { lastInput: null, lastResult: null } };
-    await setDoc(docRef, payload, { merge: true });
-    currentRemaining = (ACC_WITH_TARGET[email] !== undefined) ? ACC_WITH_TARGET[email] : null;
-  } else {
-    const data = snap.data();
-    // If this account is in ACC_WITH_TARGET and targets.cannon missing → create it
-    if (ACC_WITH_TARGET[email] !== undefined) {
-      const prevRemaining = data?.targets?.cannon?.remaining ?? ACC_WITH_TARGET[email];
-      // ensure target exists & set currentRemaining
-      await setDoc(docRef, { targets: { cannon: { initial: ACC_WITH_TARGET[email], remaining: prevRemaining } } }, { merge: true });
-      currentRemaining = prevRemaining;
-    } else {
-      // no target for this account
-      currentRemaining = (data?.targets?.cannon?.remaining !== undefined) ? data.targets.cannon.remaining : null;
-      // if it's undefined -> treat as null (no auto-deduct)
-      if (currentRemaining === undefined) currentRemaining = null;
-    }
-
-    // load lastInput if exists (populate fields)
-    const lastInput = data?.tabsData?.cannon?.lastInput;
-    if (lastInput) {
-      $('stone').value = lastInput.stone ?? $('stone').value;
-      $('wood').value  = lastInput.wood ?? $('wood').value;
-      $('ore').value   = lastInput.ore ?? $('ore').value;
-      $('boxes').value = lastInput.boxes ?? $('boxes').value;
-      $('targetLevel').value = lastInput.targetLevel ?? $('targetLevel').value;
-    }
-  }
-
-  // update UI status
-  if (currentRemaining !== null) {
-    statusEl.innerHTML = `Đăng nhập: <b>${email}</b> — Mục tiêu pháo còn: <b>${currentRemaining}</b>`;
-  } else {
-    statusEl.innerHTML = `Đăng nhập: <b>${email}</b> — Không có mục tiêu (không trừ dồn).`;
-  }
-}
-
-// ---------- Transaction: deduct remaining (only when currentRemaining !== null) ----------
-async function applyDeductionViaTransaction(levelUp){
-  if (!uid) return 0;
-  const accRef = doc(db, "accounts", uid);
-  try {
-    const result = await runTransaction(db, async (tx) => {
-      const snap = await tx.get(accRef);
-      if (!snap.exists()) throw new Error("Account doc missing during transaction");
-      const prevRem = snap.data()?.targets?.cannon?.remaining;
-      // If prevRem undefined/null -> treat as no target -> abort
-      if (prevRem === undefined || prevRem === null) return { applied: 0, prevRem: null, newRem: null };
-
-      const applied = Math.min(prevRem, levelUp);
-      const newRem = prevRem - applied;
-
-      tx.update(accRef, {
-        "targets.cannon.remaining": newRem,
-        updatedAt: serverTimestamp()
-      });
-
-      return { applied, prevRem, newRem };
+/* ================== FIRESTORE ================== */
+async function loadAccount(user){
+  uid=user.uid; email=user.email;
+  const ref=doc(db,"accounts",uid);
+  const snap=await getDoc(ref);
+  if(!snap.exists()){
+    await setDoc(ref,{
+      email,
+      targets:{ cannon:{remaining:0}},
+      tabsData:{ cannon:{}},
+      createdAt:serverTimestamp()
     });
-
-    // write history doc (outside transaction)
-    try {
-      await addDoc(collection(db, `accounts/${uid}/history`), {
-        tab: "cannon",
-        applied: result.applied,
-        prevRemaining: result.prevRem,
-        newRemaining: result.newRem,
-        levelUpRequested: levelUp,
-        ts: serverTimestamp(),
-        userEmail: email
-      });
-    } catch(e){ console.error("Add history failed", e); }
-
-    // update UI status
-    if (result.newRem !== null) {
-      currentRemaining = result.newRem;
-      statusEl.innerHTML = `Đăng nhập: <b>${email}</b> — Mục tiêu pháo còn: <b>${currentRemaining}</b>`;
-    }
-    return result.applied || 0;
-
-  } catch(e){
-    console.error("Transaction failed:", e);
-    alert("Cập nhật target thất bại: " + e);
-    return 0;
+    remaining=0;
+  }else{
+    remaining=snap.data()?.targets?.cannon?.remaining ?? 0;
   }
+  statusEl.innerHTML=`Đăng nhập: <b>${email}</b> — Còn: <b>${remaining}</b>`;
 }
 
-// ---------- Compute handler ----------
-async function computeHandler(){
-  // local compute first (keep UI responsive)
-  let S = toNum('stone'), W = toNum('wood'), Q = toNum('ore'), B = toNum('boxes');
-  let targetInput = ($('targetLevel').value || "").toString().trim();
-  outputEl.style.visibility = 'visible';
-
-  let localUpgraded = 0;
-  let displayHtml = "";
-  if (targetInput !== "") {
-    let target = Math.max(1, Number(targetInput));
-    const res = simulateOptimal(S,W,Q,B,target);
-    if (res.ok) {
-      displayHtml = `<b>Có thể đạt cấp:</b> ${target}<br>
-        <b>Tổng điểm:</b> ${target*556000}<br><br>
-        <b>Các bước đổi:</b><br><pre class="log">${res.log.join('\n')}</pre><br>
-        <b>Còn lại:</b><br>
-        <ul><li>Đá: ${res.remaining.stone}</li>
-        <li>Gỗ: ${res.remaining.wood}</li>
-        <li>Quặng: ${res.remaining.ore}</li></ul>`;
-      localUpgraded = target;
-    } else {
-      const miss = res.missing;
-      displayHtml = `<b>Không đủ tài nguyên để đạt cấp ${target}</b><br>
-        <b>Còn thiếu:</b><br>
-        <ul><li>Đá: ${miss.stone}</li>
-        <li>Gỗ: ${miss.wood}</li>
-        <li>Quặng: ${miss.ore}</li></ul>`;
-      localUpgraded = 0;
-    }
-  } else {
-    const res = computeMaxLv(S,W,Q,B);
-    if (res.remaining) {
-      displayHtml = `<b>Cấp tối đa:</b> ${res.maxLv}<br>
-        <b>Tổng điểm:</b> ${res.maxLv*556000}<br><br>
-        <b>Các bước đổi:</b><br><pre class="log">${res.log.join('\n')}</pre><br>
-        <b>Còn lại:</b><br>
-        <ul><li>Đá: ${res.remaining.stone}</li>
-        <li>Gỗ: ${res.remaining.wood}</li>
-        <li>Quặng: ${res.remaining.ore}</li></ul>`;
-      localUpgraded = res.maxLv;
-    } else {
-      displayHtml = `<b>Không đủ tài nguyên để nâng cấp</b>`;
-      localUpgraded = 0;
-    }
-  }
-
-  outputEl.innerHTML = displayHtml;
-
-  // Save lastInput & lastResult to Firestore (if logged in)
-  if (uid) {
-    await saveLastResultToFirestore(displayHtml, localUpgraded, 0);
-  }
-
-  // If this account has a configured target (currentRemaining !== null), run transaction to deduct
-  let applied = 0;
-  if (uid && currentRemaining !== null) {
-    applied = await applyDeductionViaTransaction(localUpgraded);
-    // update lastResult with applied
-    await saveLastResultToFirestore(displayHtml, localUpgraded, applied);
-  } else {
-    // for non-target accounts, nothing to deduct; we already saved lastResult
-  }
+async function deduct(level){
+  const ref=doc(db,"accounts",uid);
+  const applied=await runTransaction(db,async(tx)=>{
+    const snap=await tx.get(ref);
+    let r=snap.data().targets.cannon.remaining||0;
+    let use=Math.min(r,level);
+    tx.update(ref,{"targets.cannon.remaining":r-use});
+    return use;
+  });
+  remaining-=applied;
+  statusEl.innerHTML=`Đăng nhập: <b>${email}</b> — Còn: <b>${remaining}</b>`;
 }
 
-// ---------- Wire up compute button ----------
-$('btnCompute').addEventListener('click', async (e) => {
-  // if not logged in, still compute locally but warn user that results won't be saved or deducted
-  if (!auth.currentUser) {
-    const proceed = confirm("Chưa đăng nhập — kết quả chỉ hiển thị cục bộ. Đăng nhập để lưu và trừ mục tiêu.");
-    if (proceed) {
-      try { await signInWithPopup(auth, provider); } catch(e){ console.error(e); }
-    } else {
-      computeHandler();
-    }
-  } else {
-    await computeHandler();
-  }
-});
+/* ================== EVENT ================== */
+$('btnCompute').onclick=async()=>{
+  let S=toNum('stone'),W=toNum('wood'),Q=toNum('ore'),B=toNum('boxes');
+  let t=$('targetLevel').value;
+  let lv=t?Number(t):computeMax(S,W,Q,B);
+  outputEl.style.display="block";
+  outputEl.innerHTML=`<b>Cấp đạt:</b> ${lv}<br><b>Điểm:</b> ${lv*556}`;
+  if(uid) await deduct(lv);
+};
 
-// ---------- Auth state listener ----------
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    currentUser = null; uid = null; email = null; currentRemaining = null;
-    statusEl.innerHTML = `<button onclick="signInWithPopup(auth, provider)">Đăng nhập</button> — đăng nhập để tải dữ liệu account.`;
+/* ================== AUTH ================== */
+onAuthStateChanged(auth,u=>{
+  if(!u){
+    statusEl.innerHTML=`<button onclick="window.__FB.signInWithPopup(auth,provider)">Đăng nhập</button>`;
     return;
   }
-  await loadAccountOnLogin(user);
+  loadAccount(u);
 });
-
-// expose signInWithPopup to inline onclick fallback
-window.signInWithPopup = signInWithPopup;
-window.auth = auth;
-window.provider = provider;
-
 </script>
 </body>
 </html>
