@@ -6,104 +6,93 @@
 <title>Tài khoản</title>
 
 <style>
-  :root{
-    --bg:#f5f7fb;
-    --card:#ffffff;
-    --accent:#2563eb;
-    --muted:#6b7280;
-  }
-  *{box-sizing:border-box;font-family:Inter,Arial,sans-serif;}
-
-  body{
-    margin:0;
-    padding:20px;
-    background:var(--bg);
-    display:flex;
-    justify-content:center;
-  }
-  .wrap{
-    width:100%;
-    max-width:800px;
-    background:var(--card);
-    padding:20px;
-    border-radius:14px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.06);
-  }
-  h1{margin-top:0;font-size:22px;}
-
-  .status{
-    padding:10px 12px;
-    background:#eef4ff;
-    border-radius:10px;
-    margin-bottom:20px;
-    font-size:14px;
-    color:#333;
-  }
-  button{
-    padding:8px 14px;
-    border:none;
-    background:var(--accent);
-    color:white;
-    border-radius:8px;
-    cursor:pointer;
-    margin:5px 0;
-    font-weight:600;
-  }
-  .acc-list{
-    margin-top:20px;
-  }
-  .acc{
-    padding:12px;
-    background:#f8fafc;
-    border-radius:10px;
-    margin-bottom:10px;
-    cursor:pointer;
-    transition:0.25s;
-    border:1px solid #e5e7eb;
-  }
-  .acc:hover{
-    background:#e2e8f0;
-  }
-  .acc-title{
-    font-size:16px;
-    font-weight:700;
-    margin-bottom:5px;
-  }
+:root{
+  --bg:#f5f7fb;
+  --card:#ffffff;
+  --accent:#2563eb;
+}
+*{box-sizing:border-box;font-family:Inter,Arial,sans-serif;}
+body{
+  margin:0;
+  padding:20px;
+  background:var(--bg);
+  display:flex;
+  justify-content:center;
+}
+.wrap{
+  width:100%;
+  max-width:820px;
+  background:var(--card);
+  padding:20px;
+  border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+h1{margin-top:0;font-size:22px;}
+.status{
+  padding:10px;
+  background:#eef4ff;
+  border-radius:10px;
+  margin-bottom:15px;
+  font-size:14px;
+}
+.acc{
+  padding:14px;
+  background:#f8fafc;
+  border-radius:12px;
+  margin-bottom:10px;
+  cursor:pointer;
+  border:1px solid #e5e7eb;
+  transition:.25s;
+}
+.acc:hover{
+  background:#e0e7ff;
+}
+.acc b{font-size:16px;}
+.logout{
+  background:#ef4444;
+  color:white;
+  border:none;
+  padding:8px 14px;
+  border-radius:8px;
+  cursor:pointer;
+}
 </style>
 </head>
 
 <body>
 <div class="wrap">
 
-  <h1>Tài khoản</h1>
+<h1>Tài khoản</h1>
+<div id="authStatus" class="status">Đang kiểm tra đăng nhập…</div>
 
-  <div id="authStatus" class="status">Đang kiểm tra đăng nhập…</div>
+<button class="logout" onclick="logout()">Đăng xuất</button>
 
-  <button onclick="signIn()">Đăng nhập</button>
-  <button style="background:#ef4444" onclick="signOutNow()">Đăng xuất</button>
-
-  <h2 style="margin-top:25px;font-size:18px;">Danh sách 9 tài khoản Dolvar</h2>
-
-  <div class="acc-list" id="accList"></div>
+<h2 style="margin-top:20px;font-size:18px;">Click để đăng nhập account</h2>
+<div id="accList"></div>
 
 </div>
 
 <script>
-/* ==========================================================
+/* ======================================================
    LẤY FIREBASE TỪ INDEX.HTML
-   ========================================================== */
+   ====================================================== */
 const FB = window.parent.__FB;
-if (!FB) {
-  document.getElementById("authStatus").innerHTML =
-    "Lỗi: không nhận được Firebase từ hệ thống!";
+if(!FB){
+  document.getElementById("authStatus").innerText =
+    "❌ Không nhận được Firebase từ index.html";
+  throw "Firebase not found";
 }
-const auth = FB?.auth || null;
-const db   = FB?.db   || null;
-const provider = FB?.provider || null;
 
-/* ==========================================================
-   DANH SÁCH 9 ACCOUNT DOLVAR
-   ========================================================== */
+const auth = FB.auth;
+
+/* ======================================================
+   PASSWORD DÙNG CHUNG (bạn đổi tùy ý)
+   ====================================================== */
+const DEFAULT_PASSWORD = "1234567";
+
+/* ======================================================
+   9 ACCOUNT DOLVAR
+   ====================================================== */
 const ACCOUNTS = [
   "minhlanne@dolvar.app",
   "minhlannho@dolvar.app",
@@ -116,56 +105,59 @@ const ACCOUNTS = [
   "dolvarbastion@dolvar.app"
 ];
 
-const accList = document.getElementById("accList");
+const list = document.getElementById("accList");
+
+/* ======================================================
+   RENDER ACCOUNT LIST
+   ====================================================== */
 ACCOUNTS.forEach(email=>{
   const div = document.createElement("div");
   div.className = "acc";
   div.innerHTML = `
-    <div class="acc-title">${email}</div>
-    <div class="acc-info" style="font-size:13px;color:#555;">
-      Tài khoản Dolvar cố định — lưu dữ liệu riêng trong Firestore.
-    </div>
+    <b>${email}</b><br>
+    <small>Click để đăng nhập</small>
   `;
-  accList.appendChild(div);
+  div.onclick = ()=>loginAccount(email);
+  list.appendChild(div);
 });
 
-/* ==========================================================
-   ACTION
-   ========================================================== */
-window.signIn = function(){
-  if (!auth || !provider){
-    alert("Firebase chưa được tải từ index.html!");
-    return;
-  }
-  auth.signInWithPopup(provider).catch(console.error);
-};
-
-window.signOutNow = function(){
-  if (!auth){
-    alert("Firebase chưa sẵn sàng!");
-    return;
-  }
-  auth.signOut();
-};
-
-/* ==========================================================
-   AUTH LISTENER
-   ========================================================== */
-if (auth){
-  auth.onAuthStateChanged(user=>{
-    const status = document.getElementById("authStatus");
-
-    if (!user){
-      status.innerHTML = `Chưa đăng nhập`;
-      return;
+/* ======================================================
+   LOGIN / AUTO REGISTER
+   ====================================================== */
+async function loginAccount(email){
+  try{
+    await auth.signInWithEmailAndPassword(email, DEFAULT_PASSWORD);
+  }catch(err){
+    if(err.code === "auth/user-not-found"){
+      await auth.createUserWithEmailAndPassword(email, DEFAULT_PASSWORD);
+    }else{
+      alert(err.message);
     }
-
-    status.innerHTML = `
-      <b>Đã đăng nhập:</b> ${user.email}<br>
-      UID: ${user.uid}
-    `;
-  });
+  }
 }
+
+/* ======================================================
+   LOGOUT
+   ====================================================== */
+function logout(){
+  auth.signOut();
+}
+
+/* ======================================================
+   AUTH STATE
+   ====================================================== */
+auth.onAuthStateChanged(user=>{
+  const s = document.getElementById("authStatus");
+  if(!user){
+    s.innerHTML = "Chưa đăng nhập";
+    return;
+  }
+  s.innerHTML = `
+    ✅ Đã đăng nhập<br>
+    <b>${user.email}</b><br>
+    UID: ${user.uid}
+  `;
+});
 </script>
 
 </body>
