@@ -118,10 +118,20 @@ async function loginAccount(email){
   }
 
   try{
-    await auth.signInWithEmailAndPassword(email, DEFAULT_PASSWORD);
+    await FB.signInWithEmailAndPassword(
+  FB.auth,
+  email,
+  DEFAULT_PASSWORD
+);
+
   }catch(err){
     if(err.code === "auth/user-not-found"){
-      await auth.createUserWithEmailAndPassword(email, DEFAULT_PASSWORD);
+     await FB.createUserWithEmailAndPassword(
+  FB.auth,
+  email,
+  DEFAULT_PASSWORD
+);
+
     }else{
       alert(err.message);
     }
@@ -133,14 +143,15 @@ async function loginAccount(email){
 ================================================== */
 function logout(){
   if(confirm("Đăng xuất account hiện tại?")){
-    auth.signOut();
+  FB.signOut(FB.auth);
+
   }
 }
 
 /* ==================================================
    AUTH STATE
 ================================================== */
-auth.onAuthStateChanged(user=>{
+FB.onAuthStateChanged(FB.auth, user=>{
   const s = document.getElementById("authStatus");
 
   if(!user){
