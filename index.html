@@ -75,13 +75,12 @@ import {
   createUserWithEmailAndPassword,
   signOut
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-
 import {
   getFirestore
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 /* ============================
-   1. Firebase Config — ĐÃ THAY
+   Firebase Config
    ============================ */
 const firebaseConfig = {
   apiKey: "AIzaSyDdKe6vnWEbSq5FHz1Y6Pz3QdVjcrrq5CA",
@@ -93,7 +92,7 @@ const firebaseConfig = {
 };
 
 /* ============================
-   2. Khởi tạo APP DUY NHẤT
+   Init
    ============================ */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -101,14 +100,30 @@ const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
 /* ============================
-   3. Công khai Firebase ra window
+   EXPORT TO ALL IFRAME TABS
    ============================ */
-window.__FB = { app, auth, db, provider, onAuthStateChanged, signInWithPopup };
+window.__FB = {
+  app,
+  auth,
+  db,
+  provider,
 
-console.log("%c✔ Firebase loaded (global)", "color:green;font-weight:bold");
+  // listeners
+  onAuthStateChanged,
+
+  // google
+  signInWithPopup,
+
+  // EMAIL / PASSWORD (CHO 9 ACCOUNT)
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
+};
+
+console.log("%c✔ Firebase loaded (FULL AUTH)", "color:green;font-weight:bold");
 
 /* ============================
-   4. Hiển thị trạng thái login
+   TOP BAR LOGIN STATUS
    ============================ */
 const topbar = document.getElementById("topLoginStatus");
 
@@ -122,9 +137,10 @@ onAuthStateChanged(auth, user=>{
     `;
     return;
   }
-  topbar.innerHTML = `Đăng nhập: <b>${user.email}</b>`;
+  topbar.innerHTML = `Đã đăng nhập: <b>${user.email}</b>`;
 });
 </script>
+
 </head>
 
 <body>
