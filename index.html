@@ -166,7 +166,10 @@ onAuthStateChanged(auth, user=>{
   <!-- Main Screen                                            -->
   <!-- ===================================================== -->
   <div class="content">
-    <div id="topLoginStatus" class="topbar">Đang kiểm tra đăng nhập…</div>
+    <div class="topbar">
+  <span id="hamburger" style="font-size:24px; cursor:pointer; margin-right:12px;">☰</span>
+  <span id="topLoginStatus">Đang kiểm tra đăng nhập…</span>
+</div>
 
     <iframe id="ifTab" src="cannon.html"></iframe>
   </div>
