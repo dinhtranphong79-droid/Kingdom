@@ -16,13 +16,22 @@
     height:100vh;
     overflow:hidden;
   }
+
+  /* Sidebar mặc định */
   .sidebar{
     width:210px;
     background:#1e293b;
     color:white;
     padding:20px 12px;
     overflow-y:auto;
+    transition: transform 0.3s ease;
   }
+
+  /* Khi ẩn sidebar */
+  .sidebar.hidden{
+    transform: translateX(-220px);
+  }
+
   .side-title{
     font-size:18px;
     font-weight:700;
@@ -58,30 +67,22 @@
     border-bottom:1px solid #ddd;
     padding:10px 15px;
     font-size:14px;
+    display:flex;
+    align-items:center;
+  }
+  #hamburger{
+    font-size:24px;
+    cursor:pointer;
+    margin-right:12px;
   }
 </style>
 
-<!-- ===================================================== -->
-<!-- Firebase GLOBAL INIT (dùng chung cho toàn bộ 8 tab)   -->
-<!-- ===================================================== -->
+<!-- Firebase và JS khác (giữ nguyên) -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getAuth,
-  GoogleAuthProvider,
-  onAuthStateChanged,
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import {
-  getFirestore
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* ============================
-   Firebase Config
-   ============================ */
 const firebaseConfig = {
   apiKey: "AIzaSyDdKe6vnWEbSq5FHz1Y6Pz3QdVjcrrq5CA",
   authDomain: "dolvar-7cc8e.firebaseapp.com",
@@ -91,68 +92,30 @@ const firebaseConfig = {
   appId: "1:284313401192:web:0d2c088d37c5fbe8f008dd"
 };
 
-/* ============================
-   Init
-   ============================ */
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const provider = new GoogleAuthProvider();
 
-/* ============================
-   EXPORT TO ALL IFRAME TABS
-   ============================ */
-window.__FB = {
-  app,
-  auth,
-  db,
-  provider,
+window.__FB = { app, auth, db, provider, onAuthStateChanged, signInWithPopup };
 
-  // listeners
-  onAuthStateChanged,
-
-  // google
-  signInWithPopup,
-
-  // EMAIL / PASSWORD (CHO 9 ACCOUNT)
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut
-};
-
-console.log("%c✔ Firebase loaded (FULL AUTH)", "color:green;font-weight:bold");
-
-/* ============================
-   TOP BAR LOGIN STATUS
-   ============================ */
 const topbar = document.getElementById("topLoginStatus");
-
 onAuthStateChanged(auth, user=>{
-  if (!user){
-    topbar.innerHTML = `
-      Chưa đăng nhập —
-      <button onclick="window.__FB.signInWithPopup(window.__FB.auth, window.__FB.provider)">
-        Đăng nhập Google
-      </button>
-    `;
+  if(!user){
+    topbar.innerHTML = `<button onclick="window.__FB.signInWithPopup(window.__FB.auth, window.__FB.provider)">Đăng nhập Google</button>`;
     return;
   }
   topbar.innerHTML = `Đã đăng nhập: <b>${user.email}</b>`;
 });
 </script>
-
 </head>
 
 <body>
-
 <div class="layout">
 
-  <!-- ===================================================== -->
-  <!-- Sidebar Navigation                                     -->
-  <!-- ===================================================== -->
+  <!-- Sidebar Navigation -->
   <div class="sidebar">
     <div class="side-title">Kingdom</div>
-
     <button class="menu-btn active" data-tab="cannon">Pháo</button>
     <button class="menu-btn" data-tab="dragon">Rồng</button>
     <button class="menu-btn" data-tab="hero">Tướng</button>
@@ -162,35 +125,38 @@ onAuthStateChanged(auth, user=>{
     <button class="menu-btn" data-tab="account">Tài khoản</button>
   </div>
 
-  <!-- ===================================================== -->
-  <!-- Main Screen                                            -->
-  <!-- ===================================================== -->
+  <!-- Main Screen -->
   <div class="content">
     <div class="topbar">
-  <span id="hamburger" style="font-size:24px; cursor:pointer; margin-right:12px;">☰</span>
-  <span id="topLoginStatus">Đang kiểm tra đăng nhập…</span>
-</div>
-
+      <span id="hamburger">☰</span>
+      <span id="topLoginStatus">Đang kiểm tra đăng nhập…</span>
+    </div>
     <iframe id="ifTab" src="cannon.html"></iframe>
   </div>
-
 </div>
 
 <script>
 /* =============================================
    Chọn tab bằng sidebar
-   ============================================= */
+============================================= */
 const iframe = document.getElementById("ifTab");
 const buttons = document.querySelectorAll(".menu-btn");
-
 buttons.forEach(btn=>{
   btn.addEventListener("click", ()=>{
     buttons.forEach(b=>b.classList.remove("active"));
     btn.classList.add("active");
-
     const tab = btn.dataset.tab;
     iframe.src = tab + ".html";
   });
+});
+
+/* =============================================
+   Ẩn/hiện sidebar bằng hamburger
+============================================= */
+const hamburger = document.getElementById("hamburger");
+const sidebar = document.querySelector(".sidebar");
+hamburger.addEventListener("click", ()=>{
+  sidebar.classList.toggle("hidden");
 });
 </script>
 
