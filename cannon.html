@@ -39,11 +39,14 @@ h2 { margin-bottom: 16px; }
    DÙNG FIREBASE CHUNG TỪ index.html
    ===================================================== */
 const FB = window.parent.__FB;
-if(!FB){
-  alert("❌ Không lấy được Firebase từ trang cha");
+if(!FB || !FB.auth){
+  console.error("❌ Firebase hoặc auth chưa sẵn sàng");
 }
-
-const { auth, db, provider, onAuthStateChanged, signInWithPopup } = FB;
+const auth = FB?.auth;
+const db = FB?.db;
+const provider = FB?.provider;
+const onAuthStateChanged = FB?.onAuthStateChanged;
+const signInWithPopup = FB?.signInWithPopup;
 
 import {
   doc, getDoc, setDoc, runTransaction,
@@ -131,13 +134,14 @@ $('btnCompute').onclick=async()=>{
 };
 
 /* ================== AUTH ================== */
-onAuthStateChanged(auth,u=>{
-  if(!u){
-    statusEl.innerHTML=`<button onclick="window.__FB.signInWithPopup(auth,provider)">Đăng nhập</button>`;
-    return;
+onAuthStateChanged(auth, async user => {
+  if(user){
+    await loadAccount(user);
+  } else {
+    statusEl.innerHTML = `<button onclick="FB.signInWithPopup(auth, provider)">Đăng nhập</button>`;
   }
-  loadAccount(u);
 });
+
 </script>
 </body>
 </html>
