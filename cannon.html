@@ -38,7 +38,13 @@ h2 { margin-bottom: 16px; }
 /* =====================================================
    DÙNG FIREBASE CHUNG TỪ index.html
    ===================================================== */
-const { auth, db, provider, onAuthStateChanged, signInWithPopup } = window.__FB;
+const FB = window.parent.__FB;
+if(!FB){
+  alert("❌ Không lấy được Firebase từ trang cha");
+}
+
+const { auth, db, provider, onAuthStateChanged, signInWithPopup } = FB;
+
 import {
   doc, getDoc, setDoc, runTransaction,
   addDoc, collection, serverTimestamp
