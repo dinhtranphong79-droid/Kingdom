@@ -33,30 +33,19 @@
 <!--      FIREBASE MODULE      -->
 <!-- ========================= -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { 
-  getFirestore, doc, getDoc, setDoc
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const FB = window.parent.__FB;
+if (!FB) {
+  alert("❌ Không nhận được Firebase từ index.html");
+}
 
-import {
-  getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+const {
+  auth,
+  db,
+  provider,
+  onAuthStateChanged,
+  signInWithPopup
+} = FB;
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDdKe6vnWEbSq5FHz1Y6Pz3QdVjcrrq5CA",
-  authDomain: "dolvar-7cc8e.firebaseapp.com",
-  projectId: "dolvar-7cc8e",
-  storageBucket: "dolvar-7cc8e.firebasestorage.app",
-  messagingSenderId: "284313401192",
-  appId: "1:284313401192:web:0d2c088d37c5fbe8f008dd",
-  measurementId: "G-D6PRWJGLGQ"
-};
-
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth();
-const provider = new GoogleAuthProvider();
 
 let currentUID = null;
 let saveTimeout = null;
