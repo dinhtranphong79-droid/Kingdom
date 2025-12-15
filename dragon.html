@@ -92,12 +92,12 @@ function autoSave(){
       },
       updatedAt: new Date()
     };
+await setDoc(
+  doc(db,"accounts",currentUID,"tabsData","dragon"),
+  payload,
+  { merge: true }
+);
 
-    await setDoc(
-      doc(db,"accounts",currentUID,"tabsData","dragon"),
-      payload,
-      { merge: true }
-    );
 
   },700);
 }
@@ -127,7 +127,12 @@ async function loadData(uid){
       lvlDragon.value = d.inputs.lvlDragon ?? 0;
 
     }
+   if (d.totalPoints != null){
+    document.getElementById("resultArea").style.display = "block";
+    document.getElementById("ptsTotal").textContent =
+      Number(d.totalPoints).toLocaleString("vi-VN");
   }
+
 }
 window.loadData = loadData;
 
@@ -138,14 +143,16 @@ window.loadData = loadData;
 async function saveTotalPoints(total){
   if (!currentUID) return;
 
-  await setDoc(
-    doc(db,"accounts",currentUID,"tabsData","dragon"),
-    {
-      totalPoints: total,
-      updatedAt: new Date()
-    },
-    { merge: true }
-  );
+await setDoc(
+  doc(db,"accounts",currentUID,"tabsData","dragon"),
+  {
+    totalPoints: total,
+    updatedAt: new Date()
+  },
+  { merge: true }
+);
+
+
 }
 window.saveTotalPoints = saveTotalPoints;
 
@@ -414,7 +421,7 @@ onAuthStateChanged(auth, async user=>{
     "lvlDong","lvlBac","lvlVang","lvlTK","lvlDragon"
   ].forEach(id=>{
     document.getElementById(id).addEventListener("input", ()=> {
-      if (window.autoSave) autoSave();
+     
     });
   });
 
