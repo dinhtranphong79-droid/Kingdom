@@ -44,9 +44,9 @@ if(!FB || !FB.auth){
 }
 const auth = FB?.auth;
 const db = FB?.db;
-const provider = FB?.provider;
+
 const onAuthStateChanged = FB?.onAuthStateChanged;
-const signInWithPopup = FB?.signInWithPopup;
+
 
 import {
   doc, getDoc, setDoc, runTransaction,
@@ -134,14 +134,24 @@ $('btnCompute').onclick=async()=>{
 };
 
 /* ================== AUTH ================== */
-onAuthStateChanged(auth, async user => {
-  if(user){
-    await loadAccount(user);
-  } else {
-    statusEl.innerHTML = `<button onclick="loginGoogle()">Đăng nhập</button>`;
-
+function waitForAuth(){
+  if (!window.parent.__FB || !window.parent.__FB.auth) {
+    return setTimeout(waitForAuth, 50);
   }
-});
+
+  const { auth, onAuthStateChanged } = window.parent.__FB;
+
+  onAuthStateChanged(auth, async user => {
+    if (user) {
+      await loadAccount(user);
+    } else {
+      statusEl.innerHTML = "❌ Chưa đăng nhập";
+    }
+  });
+}
+
+waitForAuth();
+
 
 </script>
 </body>
