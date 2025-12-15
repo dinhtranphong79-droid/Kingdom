@@ -120,16 +120,37 @@ async function deduct(level){
   statusEl.innerHTML=`Đăng nhập: <b>${email}</b> — Còn: <b>${remaining}</b>`;
 }
 
+  async function saveTotalPoints(tabName, points){
+  const ref = doc(db, "accounts", uid, "tabsData", tabName);
+  await setDoc(
+    ref,
+    {
+      totalPoints: points,
+      updatedAt: serverTimestamp()
+    },
+    { merge: true }
+  );
+}
+
+
 /* ================== EVENT ================== */
 $('btnCompute').onclick=async()=>{
   let S=toNum('stone'),W=toNum('wood'),Q=toNum('ore'),B=toNum('boxes');
   let t=$('targetLevel').value;
   let lv=t?Number(t):computeMax(S,W,Q,B);
   outputEl.style.display="block";
-  outputEl.innerHTML=`<b>Cấp đạt:</b> ${lv}<br><b>Điểm:</b> ${lv*556000}`;
-  if(uid) await deduct(lv);
-};
+ const points = lv * 556000;
 
+outputEl.innerHTML = `
+  <b>Cấp đạt:</b> ${lv}<br>
+  <b>Điểm:</b> ${points.toLocaleString("vi-VN")}
+`;
+
+if(uid){
+  await saveTotalPoints("cannon", points);
+}
+
+};
 /* ================== AUTH ================== */
 function waitForAuth(){
   if (!window.parent.__FB || !window.parent.__FB.auth) {
