@@ -38,14 +38,7 @@ h2 { margin-bottom: 16px; }
 /* =====================================================
    DÙNG FIREBASE CHUNG TỪ index.html
    ===================================================== */
-const FB = window.parent.__FB;
-if(!FB || !FB.auth){
-  console.error("❌ Firebase hoặc auth chưa sẵn sàng");
-}
-const auth = FB?.auth;
-const db = FB?.db;
 
-const onAuthStateChanged = FB?.onAuthStateChanged;
 
 
 import {
@@ -58,7 +51,11 @@ const $ = id => document.getElementById(id);
 const statusEl = $('status');
 const outputEl = $('output');
 
+
 /* ================== STATE ================== */
+  let auth = null;
+let db   = null;
+
 let uid=null, email=null, remaining=null;
 
 /* ================== TÍNH TOÁN (GIỮ NGUYÊN LOGIC) ================== */
@@ -139,9 +136,12 @@ function waitForAuth(){
     return setTimeout(waitForAuth, 50);
   }
 
-  const { auth, onAuthStateChanged } = window.parent.__FB;
+  const FB = window.parent.__FB;
 
-  onAuthStateChanged(auth, async user => {
+  auth = FB.auth;   // ✅ gán vào biến global
+  db   = FB.db;
+
+  FB.onAuthStateChanged(auth, async user => {
     if (user) {
       await loadAccount(user);
     } else {
@@ -151,6 +151,7 @@ function waitForAuth(){
 }
 
 waitForAuth();
+
 
 
 </script>
