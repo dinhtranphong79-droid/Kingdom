@@ -27,10 +27,17 @@
     transition: transform 0.3s ease;
   }
 
-  /* Khi ẩn sidebar */
-  .sidebar.hidden{
-    transform: translateX(-220px);
-  }
+.layout.hide-sidebar .sidebar{
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.layout.hide-sidebar .content{
+  flex: 1;
+  width: 100%;
+}
+
 
   .side-title{
     font-size:18px;
@@ -151,14 +158,16 @@ buttons.forEach(btn=>{
 });
 
 /* =============================================
-   Ẩn/hiện sidebar bằng hamburger
+   Ẩn/hiện sidebar bằng hamburger (ĐÚNG)
 ============================================= */
 const hamburger = document.getElementById("hamburger");
-const sidebar = document.querySelector(".sidebar");
+const layout = document.querySelector(".layout");
+
 hamburger.addEventListener("click", ()=>{
-  sidebar.classList.toggle("hidden");
+  layout.classList.toggle("hide-sidebar");
 });
 </script>
+
 
 </body>
 </html>
