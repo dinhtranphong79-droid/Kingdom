@@ -138,7 +138,8 @@ onAuthStateChanged(auth, async user => {
   if(user){
     await loadAccount(user);
   } else {
-    statusEl.innerHTML = `<button onclick="FB.signInWithPopup(auth, provider)">Đăng nhập</button>`;
+    statusEl.innerHTML = `<button onclick="loginGoogle()">Đăng nhập</button>`;
+
   }
 });
 
