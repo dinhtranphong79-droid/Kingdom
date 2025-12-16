@@ -190,7 +190,10 @@ import {
   updateSeasonDisplay();
 
   // recalc on input
-  document.body.addEventListener('input', calcAll);
+ document.querySelectorAll('input').forEach(el=>{
+  el.addEventListener('input', calcAll);
+});
+
 
   function calcAll(){
     const season = seasons[parseInt(seasonSel.value||0) || 0];
@@ -233,11 +236,13 @@ import {
     if(totalDisplay) totalDisplay.textContent = `Tổng điểm: ${Number(totalPoints).toLocaleString('vi-VN')}`;
 
     // Save totalPoints to Firestore (if logged in) and also autosave inputs (handled separately)
-    saveTotalPointsToFirestore(totalPoints).catch(e=>console.error("saveTotalPoints error", e));
-  }
+   if (!isLoadingFromFirestore) {
+  saveTotalPointsToFirestore(totalPoints)
+    .catch(e=>console.error("saveTotalPoints error", e));
+}
 
-  // initial calc
-  calcAll();
+
+
 
   // --- Add-only calculator (created on demand) ---
   let calcElement = null; // single instance
@@ -343,6 +348,7 @@ import {
 
   let currentUID = null;
   let saveTimer = null;
+  let isLoadingFromFirestore = false;  
 
   // helper to read inputs into an object
   function readAllInputs(){
@@ -382,18 +388,20 @@ import {
     el.addEventListener('input', saveInputsToFirestoreDebounced);
   });
 
-  // save totalPoints (no debounce needed; called from calcAll)
-  async function saveTotalPointsToFirestore(totalPoints){
-    if (!currentUID) return;
-    try {
-      const accRef = doc(db, "accounts", currentUID);
-      const payload = { tabsData: { barracks: { totalPoints: Number(totalPoints), updatedAt: serverTimestamp() } } };
-      await setDoc(accRef, payload, { merge: true });
-      // console.log("totalPoints saved:", totalPoints);
-    } catch(e){
-      console.error("saveTotalPointsToFirestore", e);
-    }
+ // save totalPoints (called from calcAll)
+async function saveTotalPointsToFirestore(totalPoints){
+  if (!currentUID) return;
+  try {
+    const ref = doc(db,"accounts",currentUID,"tabsData","barracks");
+    await setDoc(ref,{
+      totalPoints: Number(totalPoints),
+      updatedAt: serverTimestamp()
+    },{ merge:true });
+  } catch(e){
+    console.error("saveTotalPointsToFirestore", e);
   }
+}
+
 
   // load saved inputs when user logs in
   async function loadBarracksDataForUID(uid){
@@ -429,8 +437,11 @@ import {
         if(totalDisplay) totalDisplay.textContent = `Tổng điểm: ${Number(tp).toLocaleString('vi-VN')}`;
       }
       // recalc UI after loading
+      isLoadingFromFirestore = true;
+
       updateSeasonDisplay();
       calcAll();
+      isLoadingFromFirestore = false;
     } catch(e){
       console.error("loadBarracksDataForUID error", e);
     }
