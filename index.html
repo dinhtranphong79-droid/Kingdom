@@ -131,15 +131,20 @@ window.__FB = {
 };
 
 
-const topbar = document.getElementById("topLoginStatus");
-onAuthStateChanged(auth, user=>{
-  if(!user){
-  topbar.innerHTML = "❌ Chưa đăng nhập – hãy chọn account";
 
-    return;
-  }
-  topbar.innerHTML = `Đã đăng nhập: <b>${user.email}</b>`;
+window.addEventListener("DOMContentLoaded", ()=>{
+  const topbar = document.getElementById("topLoginStatus");
+
+  onAuthStateChanged(auth, user=>{
+    if(!user){
+      topbar.innerHTML = "❌ Chưa đăng nhập – hãy chọn account";
+      return;
+    }
+    topbar.innerHTML = `Đã đăng nhập: <b>${user.email}</b>`;
+  });
 });
+
+
 </script>
 </head>
 
