@@ -60,33 +60,82 @@ let uid=null, email=null, remaining=null;
 
 /* ================== TÍNH TOÁN (GIỮ NGUYÊN LOGIC) ================== */
 function toNum(id){ return Number($(id).value)||0; }
+function simulateOptimal(S, W, Q, B, lv){
+  const needStone = 1260 * lv;
+  const needWood  = 340 * lv;
+  const needOre   = 130 * lv;
 
-function simulateOptimal(S,W,Q,B,lv){
-  const needStone=1260*lv, needWood=340*lv, needOre=130*lv;
-  let log=[];
-  let boxForOre=Math.min(B,needOre-Q); Q+=boxForOre; B-=boxForOre;
-  let boxForWood=Math.min(B,Math.ceil((needWood-W)/4)); W+=boxForWood*4; B-=boxForWood;
-  S+=B*20;
+  let log = [];
 
-  while(true){
-    let missOre=Math.max(0,needOre-Q);
-    let missWood=Math.max(0,needWood-W);
-    let s2w=Math.min(Math.floor(S/5),missWood+missOre*4);
-    let w2o=Math.min(Math.floor(W/4),missOre);
-    if(s2w<=0 && w2o<=0) break;
-    S-=s2w*5; W+=s2w;
-    W-=w2o*4; Q+=w2o;
+  /* 1️⃣ Hộp pháo */
+  let boxForOre = Math.min(B, needOre - Q);
+  if(boxForOre > 0){
+    log.push({step:"Hộp → Quặng", detail:`${boxForOre} hộp → +${boxForOre} quặng`});
+    Q += boxForOre; B -= boxForOre;
   }
 
-  if(S<needStone||W<needWood||Q<needOre) return {ok:false};
-  return {ok:true, remain:{S:S-needStone,W:W-needWood,Q:Q-needOre}};
+  let boxForWood = Math.min(B, Math.ceil((needWood - W) / 4));
+  if(boxForWood > 0){
+    log.push({step:"Hộp → Gỗ", detail:`${boxForWood} hộp → +${boxForWood*4} gỗ`});
+    W += boxForWood * 4; B -= boxForWood;
+  }
+
+  if(B > 0){
+    log.push({step:"Hộp → Đá", detail:`${B} hộp → +${B*20} đá`});
+    S += B * 20;
+    B = 0;
+  }
+
+  /* 2️⃣ Quy đổi tài nguyên */
+  while(true){
+    let missOre  = Math.max(0, needOre - Q);
+    let missWood = Math.max(0, needWood - W);
+
+    let s2w = Math.min(Math.floor(S / 5), missWood + missOre * 4);
+    if(s2w > 0){
+      log.push({step:"Đá → Gỗ", detail:`${s2w*5} đá → +${s2w} gỗ`});
+      S -= s2w * 5;
+      W += s2w;
+    }
+
+    let w2o = Math.min(Math.floor(W / 4), missOre);
+    if(w2o > 0){
+      log.push({step:"Gỗ → Quặng", detail:`${w2o*4} gỗ → +${w2o} quặng`});
+      W -= w2o * 4;
+      Q += w2o;
+    }
+
+    if(s2w <= 0 && w2o <= 0) break;
+  }
+
+  if(S < needStone || W < needWood || Q < needOre){
+    return { ok:false, log };
+  }
+
+  return {
+    ok: true,
+    log,
+    remain: {
+      S: S - needStone,
+      W: W - needWood,
+      Q: Q - needOre
+    }
+  };
 }
 
 function computeMax(S,W,Q,B){
-  let lv=0;
-  while(simulateOptimal(S,W,Q,B,lv+1).ok) lv++;
-  return lv;
+  let lv = 0;
+  let last = null;
+  while(true){
+    const r = simulateOptimal(S,W,Q,B,lv+1);
+    if(!r.ok) break;
+    lv++;
+    last = r;
+  }
+  return { lv, result: last };
 }
+
+
 
 /* ================== FIRESTORE ================== */
 async function loadAccount(user){
@@ -119,38 +168,71 @@ async function deduct(level){
   remaining-=applied;
   statusEl.innerHTML=`Đăng nhập: <b>${email}</b> — Còn: <b>${remaining}</b>`;
 }
-
-  async function saveTotalPoints(tabName, points){
+async function saveTotalPoints(tabName, points, log){
   const ref = doc(db, "accounts", uid, "tabsData", tabName);
-  await setDoc(
-    ref,
-    {
-      totalPoints: points,
-      updatedAt: serverTimestamp()
-    },
-    { merge: true }
-  );
+  await setDoc(ref,{
+    totalPoints: points,
+    log: log,
+    updatedAt: serverTimestamp()
+  },{merge:true});
 }
+
+
 
 
 /* ================== EVENT ================== */
-$('btnCompute').onclick=async()=>{
-  let S=toNum('stone'),W=toNum('wood'),Q=toNum('ore'),B=toNum('boxes');
-  let t=$('targetLevel').value;
-  let lv=t?Number(t):computeMax(S,W,Q,B);
-  outputEl.style.display="block";
- const points = lv * 556000;
+$('btnCompute').onclick = async () => {
+  let S = toNum('stone'),
+      W = toNum('wood'),
+      Q = toNum('ore'),
+      B = toNum('boxes');
 
-outputEl.innerHTML = `
-  <b>Cấp đạt:</b> ${lv}<br>
-  <b>Điểm:</b> ${points.toLocaleString("vi-VN")}
-`;
+  let t = $('targetLevel').value;
 
-if(uid){
-  await saveTotalPoints("cannon", points);
-}
+  let lv;
+  let res;
 
+  if (t) {
+    lv = Number(t);
+    res = simulateOptimal(S, W, Q, B, lv);
+  } else {
+    const r = computeMax(S, W, Q, B);
+    lv = r.lv;
+    res = r.result;
+  }
+
+  if (!res || !res.ok) {
+    outputEl.style.display = "block";
+    outputEl.innerHTML = `
+      <b>❌ Không đủ tài nguyên để đạt cấp ${lv}</b><br><br>
+      ${renderLogTable(res?.log)}
+    `;
+    return;
+  }
+
+  const points = lv * 556000;
+
+  outputEl.style.display = "block";
+  outputEl.innerHTML = `
+    <b>Cấp đạt:</b> ${lv}<br>
+    <b>Điểm:</b> ${points.toLocaleString("vi-VN")}<br><br>
+
+    <b>Các bước quy đổi:</b>
+    ${renderLogTable(res.log)}
+
+    <br><b>Còn lại:</b>
+    <ul>
+      <li>Đá: ${res.remain.S}</li>
+      <li>Gỗ: ${res.remain.W}</li>
+      <li>Quặng: ${res.remain.Q}</li>
+    </ul>
+  `;
+
+  if (uid) {
+    await saveTotalPoints("cannon", points, res.log);
+  }
 };
+
 /* ================== AUTH ================== */
 function waitForAuth(){
   if (!window.parent.__FB || !window.parent.__FB.auth) {
@@ -178,6 +260,27 @@ function waitForAuth(){
 
 waitForAuth();
 
+function renderLogTable(log){
+  if(!log || log.length === 0) return "<i>Không có quy đổi</i>";
+
+  let html = `
+  <table style="width:100%;border-collapse:collapse;margin-top:10px">
+    <tr style="background:#e5e7eb">
+      <th style="border:1px solid #ccc;padding:6px">Bước</th>
+      <th style="border:1px solid #ccc;padding:6px">Chi tiết</th>
+    </tr>`;
+
+  log.forEach(l=>{
+    html += `
+      <tr>
+        <td style="border:1px solid #ccc;padding:6px">${l.step}</td>
+        <td style="border:1px solid #ccc;padding:6px">${l.detail}</td>
+      </tr>`;
+  });
+
+  html += "</table>";
+  return html;
+}
 
 
 
