@@ -59,19 +59,35 @@ button{
 
 </div>
 
+
 <script>
-/* ==================================================
-   KẾT NỐI FIREBASE TỪ index.html
-================================================== */
-const FB = window.parent.__FB;
-if(!FB){ alert("❌ Không nhận được Firebase"); }
+/* ================= BIẾN TOÀN CỤC ================= */
+let FB = null;
+let auth = null;
 
-const auth = FB.auth;
+/* ================= CHỜ FIREBASE ================= */
+function waitForFB(){
+  if(window.__FB){
+    init(window.__FB);
+    return;
+  }
+  if(window.parent && window.parent.__FB){
+    init(window.parent.__FB);
+    return;
+  }
+  setTimeout(waitForFB, 100);
+}
 
-/* ==================================================
-   CẤU HÌNH ACCOUNT
-================================================== */
-const DEFAULT_PASSWORD = "1234567"; // bạn có thể đổi
+function init(_FB){
+  FB = _FB;
+  auth = FB.auth;
+  initAuth();
+}
+
+waitForFB();
+
+/* ================= CẤU HÌNH ACCOUNT ================= */
+const DEFAULT_PASSWORD = "1234567";
 
 const ACCOUNTS = [
   "minhlanne@dolvar.app",
@@ -87,9 +103,7 @@ const ACCOUNTS = [
 
 const accList = document.getElementById("accList");
 
-/* ==================================================
-   RENDER ACCOUNT
-================================================== */
+/* ================= RENDER ================= */
 function renderAccounts(locked){
   accList.innerHTML = "";
   ACCOUNTS.forEach(email=>{
@@ -104,71 +118,51 @@ function renderAccounts(locked){
   });
 }
 
-/* ==================================================
-   LOGIN + LOCK
-================================================== */
+/* ================= LOGIN ================= */
 async function loginAccount(email){
   if(auth.currentUser){
-    alert(
-      "🔒 Đang đăng nhập:\n" +
-      auth.currentUser.email +
-      "\n\nĐăng xuất để đổi account."
-    );
+    alert("🔒 Đang đăng nhập:\n" + auth.currentUser.email);
     return;
   }
-
   try{
-    await FB.signInWithEmailAndPassword(
-  FB.auth,
-  email,
-  DEFAULT_PASSWORD
-);
-
+    await FB.signInWithEmailAndPassword(auth, email, DEFAULT_PASSWORD);
   }catch(err){
     if(err.code === "auth/user-not-found"){
-     await FB.createUserWithEmailAndPassword(
-  FB.auth,
-  email,
-  DEFAULT_PASSWORD
-);
-
+      await FB.createUserWithEmailAndPassword(auth, email, DEFAULT_PASSWORD);
     }else{
       alert(err.message);
     }
   }
 }
 
-/* ==================================================
-   LOGOUT
-================================================== */
+/* ================= LOGOUT ================= */
 function logout(){
   if(confirm("Đăng xuất account hiện tại?")){
-  FB.signOut(FB.auth);
-
+    FB.signOut(auth);
   }
 }
 
-/* ==================================================
-   AUTH STATE
-================================================== */
-FB.onAuthStateChanged(FB.auth, user=>{
-  const s = document.getElementById("authStatus");
+/* ================= AUTH STATE ================= */
+function initAuth(){
+  FB.onAuthStateChanged(auth, user=>{
+    const s = document.getElementById("authStatus");
 
-  if(!user){
-    s.innerHTML = "❌ Chưa đăng nhập";
-    renderAccounts(false);
-    return;
-  }
+    if(!user){
+      s.innerHTML = "❌ Chưa đăng nhập";
+      renderAccounts(false);
+      return;
+    }
 
-  s.innerHTML = `
-    ✅ Đã đăng nhập<br>
-    <b>${user.email}</b><br>
-    UID: ${user.uid}
-  `;
-
-  renderAccounts(true); // KHÓA KHÔNG CHO ĐỔI
-});
+    s.innerHTML = `
+      ✅ Đã đăng nhập<br>
+      <b>${user.email}</b><br>
+      UID: ${user.uid}
+    `;
+    renderAccounts(true);
+  });
+}
 </script>
+
 
 </body>
 </html>
