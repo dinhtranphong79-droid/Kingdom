@@ -158,20 +158,23 @@ import {
    ============================ */
 (function(){
   // --- Core data ---
-  const seasons = [
-    {name:"Season 20", bookPoint:2.8, crownPoint:28},
-    {name:"Season 21", bookPoint:1.12, crownPoint:11.2},
-    {name:"Season 22", bookPoint:1.12, crownPoint:11.2},
-    {name:"Season 23", bookPoint:1.12, crownPoint:11.2},
-    {name:"Season 24", bookPoint:1.12, crownPoint:11.2},
-    {name:"Season 25", bookPoint:0.56, crownPoint:5.6},
-    {name:"Season 26", bookPoint:0.56, crownPoint:5.6},
-    {name:"Season 27", bookPoint:0.224, crownPoint:2.24}
-  ];
+ const seasons = [
+  {name:"Season 20", bookPoint:2.8, crownPoint:28},
+  {name:"Season 21", bookPoint:1.12, crownPoint:11.2},
+  {name:"Season 22", bookPoint:1.12, crownPoint:11.2},
+  {name:"Season 23", bookPoint:1.12, crownPoint:11.2},
+  {name:"Season 24", bookPoint:1.12, crownPoint:11.2},
+  {name:"Season 25", bookPoint:0.56, crownPoint:5.6},
+  {name:"Season 26", bookPoint:0.56, crownPoint:5.6},
+  {name:"Season 27", bookPoint:0.224, crownPoint:2.24},
+  {name:"Season 28", bookPoint:0.224, crownPoint:2.24}
+];
+
 
   const gm1Costs = [5,20,100,500,2500,12500,62500,312500,1562500,7812500];
   const gm2Book  = [10,40,200,1000,5000,25000,125000,625000,3125000,15625000];
-  const gm2Crown = [5,20,100,500,2500,12500,62500,312500,1562500,78125000];
+  const gm2Crown = [5,20,100,500,2500,12500,62500,312500,1562500,7812500];
+
 
   // DOM refs
   const seasonSel = document.getElementById('seasonSelect');
@@ -184,19 +187,39 @@ import {
   if(seasonSel){
     seasons.forEach((s,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=s.name; seasonSel.appendChild(op); });
     seasonSel.selectedIndex = 0;
+    updateSeasonDisplay(); 
     seasonSel.addEventListener('change', ()=>{ updateSeasonDisplay(); calcAll(); });
   }
-  function updateSeasonDisplay(){ const s = seasons[seasonSel.value||0]; document.getElementById('spBook').textContent = s.bookPoint; document.getElementById('spCrown').textContent = s.crownPoint; }
-  updateSeasonDisplay();
+ function updateSeasonDisplay(){
+  const idx = Math.min(
+    Number(seasonSel.value) || 0,
+    seasons.length - 1
+  );
+  const s = seasons[idx];
+  document.getElementById('spBook').textContent = s.bookPoint;
+  document.getElementById('spCrown').textContent = s.crownPoint;
+}
 
+  let currentUID = null;
+  let saveTimer = null;
+  let isLoadingFromFirestore = false;  
   // recalc on input
- document.querySelectorAll('input').forEach(el=>{
-  el.addEventListener('input', calcAll);
+document.querySelectorAll('input').forEach(el=>{
+  el.addEventListener('input', ()=>{
+    if (isLoadingFromFirestore) return;
+  if (seasonSel.value === null || seasonSel.value === undefined) return;
+
+    calcAll();
+  });
 });
 
 
+
   function calcAll(){
-    const season = seasons[parseInt(seasonSel.value||0) || 0];
+  const season =
+  seasons[parseInt(seasonSel.value) || 0] ||
+  seasons[seasons.length - 1];
+
     let books = Math.max(0, Math.floor(Number(inBooks.value) || 0));
     let crowns = Math.max(0, Math.floor(Number(inCrowns.value) || 0));
 
@@ -346,9 +369,7 @@ import {
 
   // ---- Firestore autosave & load integration ----
 
-  let currentUID = null;
-  let saveTimer = null;
-  let isLoadingFromFirestore = false;  
+
 
   // helper to read inputs into an object
   function readAllInputs(){
@@ -369,6 +390,9 @@ import {
   }
 
   async function saveInputsToFirestoreDebounced(){
+    
+    if (isLoadingFromFirestore) return;
+
     if (!currentUID) return;
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(async ()=>{
@@ -392,35 +416,64 @@ import {
 async function saveTotalPointsToFirestore(totalPoints){
   if (!currentUID) return;
   try {
-    const ref = doc(db,"accounts",currentUID,"tabsData","barracks");
+    const ref = doc(db,"accounts",currentUID);
     await setDoc(ref,{
-      totalPoints: Number(totalPoints),
-      updatedAt: serverTimestamp()
+      tabsData:{
+        barracks:{
+          totalPoints: Number(totalPoints),
+          updatedAt: serverTimestamp()
+        }
+      }
     },{ merge:true });
   } catch(e){
-    console.error("saveTotalPointsToFirestore", e);
+    console.error("saveTotalPoints failed", e);
   }
 }
 
 
+
   // load saved inputs when user logs in
-  async function loadBarracksDataForUID(uid){
-    try {
-      const accRef = doc(db, "accounts", uid);
-      const snap = await getDoc(accRef);
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const saved = data?.tabsData?.barracks;
-      if (!saved) return;
-      const inputs = saved.inputs;
-      if (inputs) {
-        seasonSel.value = inputs.season ?? seasonSel.value;
-        inBooks.value = inputs.inBooks ?? inBooks.value;
-        inCrowns.value = inputs.inCrowns ?? inCrowns.value;
-        document.getElementById('t1').value = inputs.t1 ?? document.getElementById('t1').value;
-        document.getElementById('t2').value = inputs.t2 ?? document.getElementById('t2').value;
-        document.getElementById('t3').value = inputs.t3 ?? document.getElementById('t3').value;
-        document.getElementById('t4').value = inputs.t4 ?? document.getElementById('t4').value;
+ async function loadBarracksDataForUID(uid){
+  isLoadingFromFirestore = true;
+  try {
+    const accRef = doc(db, "accounts", uid);
+    const snap = await getDoc(accRef);
+    if (!snap.exists()) return;
+
+    const data = snap.data();
+    const saved = data?.tabsData?.barracks;
+    if (!saved) return;
+
+    const inputs = saved.inputs;
+    if (inputs) {
+      seasonSel.value = inputs.season ?? seasonSel.value;
+      inBooks.value = inputs.inBooks ?? inBooks.value;
+      inCrowns.value = inputs.inCrowns ?? inCrowns.value;
+      document.getElementById('t1').value = inputs.t1 ?? 0;
+      document.getElementById('t2').value = inputs.t2 ?? 0;
+      document.getElementById('t3').value = inputs.t3 ?? 0;
+      document.getElementById('t4').value = inputs.t4 ?? 0;
+
+      if (Array.isArray(inputs.gm1Done)) {
+        document.querySelectorAll('.gm1Done')
+          .forEach((el,i)=> el.value = inputs.gm1Done[i] ?? 0);
+      }
+      if (Array.isArray(inputs.gm2Done)) {
+        document.querySelectorAll('.gm2Done')
+          .forEach((el,i)=> el.value = inputs.gm2Done[i] ?? 0);
+      }
+    }
+
+    updateSeasonDisplay();
+    calcAll();
+
+  } catch(e){
+    console.error("loadBarracksDataForUID error", e);
+  } finally {
+    isLoadingFromFirestore = false;
+  }
+}
+
         // gm1Done/gm2Done arrays
         if (Array.isArray(inputs.gm1Done)) {
           const els = document.querySelectorAll('.gm1Done');
@@ -437,15 +490,8 @@ async function saveTotalPointsToFirestore(totalPoints){
         if(totalDisplay) totalDisplay.textContent = `Tổng điểm: ${Number(tp).toLocaleString('vi-VN')}`;
       }
       // recalc UI after loading
-      isLoadingFromFirestore = true;
+    
 
-      updateSeasonDisplay();
-      calcAll();
-      isLoadingFromFirestore = false;
-    } catch(e){
-      console.error("loadBarracksDataForUID error", e);
-    }
-  }
 
   // Auth handling
   function promptSignIn(){
