@@ -425,10 +425,12 @@ async function saveTotalPointsToFirestore(totalPoints){
         }
       }
     },{ merge:true });
+    import { recomputeSummaryTotal } from "../shared/summary.service.js";
   } catch(e){
     console.error("saveTotalPoints failed", e);
   }
 }
+
 
 
 
