@@ -188,7 +188,13 @@ import {
     seasons.forEach((s,i)=>{ const op=document.createElement('option'); op.value=i; op.textContent=s.name; seasonSel.appendChild(op); });
     seasonSel.selectedIndex = 0;
     updateSeasonDisplay(); 
-    seasonSel.addEventListener('change', ()=>{ updateSeasonDisplay(); calcAll(); });
+    seasonSel.addEventListener('change', ()=>{
+  if (isLoadingFromFirestore) return;
+  updateSeasonDisplay();
+  calcAll();
+  saveInputsToFirestoreDebounced();
+});
+
   }
  function updateSeasonDisplay(){
   const idx = Math.min(
