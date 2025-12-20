@@ -35,6 +35,10 @@ h2 { margin-bottom: 16px; }
 </div>
 
 <script type="module">
+  
+  import { recomputeSummaryTotal } from "../shared/summary.service.js";
+
+
 /* =====================================================
    DÙNG FIREBASE CHUNG TỪ index.html
    ===================================================== */
@@ -175,6 +179,8 @@ async function saveTotalPoints(tabName, points, log){
     log: log,
     updatedAt: serverTimestamp()
   },{merge:true});
+
+ await recomputeSummaryTotal(uid);
 }
 
 
