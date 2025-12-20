@@ -33,6 +33,8 @@
 <!--      FIREBASE MODULE      -->
 <!-- ========================= -->
 <script type="module">
+  import { recomputeSummaryTotal } from "../shared/summary.service.js";
+
 const FB = window.parent.__FB;
   import {
   doc,
@@ -152,7 +154,7 @@ await setDoc(
   { merge: true }
 );
 
-
+ await recomputeSummaryTotal(currentUID);
 }
 window.saveTotalPoints = saveTotalPoints;
 
