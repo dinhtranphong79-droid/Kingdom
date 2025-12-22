@@ -431,7 +431,7 @@ async function saveTotalPointsToFirestore(totalPoints){
         }
       }
     },{ merge:true });
-    import { recomputeSummaryTotal } from "../shared/summary.service.js";
+  
   } catch(e){
     console.error("saveTotalPoints failed", e);
   }
@@ -482,18 +482,7 @@ async function saveTotalPointsToFirestore(totalPoints){
   }
 }
 
-        // gm1Done/gm2Done arrays
-        if (Array.isArray(inputs.gm1Done)) {
-          const els = document.querySelectorAll('.gm1Done');
-          inputs.gm1Done.forEach((v,i)=>{ if(els[i]) els[i].value = v; });
-        }
-        if (Array.isArray(inputs.gm2Done)) {
-          const els2 = document.querySelectorAll('.gm2Done');
-          inputs.gm2Done.forEach((v,i)=>{ if(els2[i]) els2[i].value = v; });
-        }
-      }
-      // load totalPoints if exists (display only)
-      const tp = saved?.totalPoints;
+      
       if (tp !== undefined && tp !== null) {
         if(totalDisplay) totalDisplay.textContent = `Tổng điểm: ${Number(tp).toLocaleString('vi-VN')}`;
       }
