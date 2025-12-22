@@ -180,8 +180,9 @@ async function saveTotalPoints(tabName, points, log){
     updatedAt: serverTimestamp()
   },{merge:true});
 
- await recomputeSummaryTotal(uid);
+  await recomputeSummaryTotal(uid);
 }
+
 
 
 
