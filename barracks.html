@@ -349,12 +349,13 @@ document.querySelectorAll('input').forEach(el=>{
   }
 
   // create on focus for each troop input
-  document.querySelectorAll('.troop-input').forEach(inp=>{
-    inp.addEventListener('focus', (e)=>{
-      showCalculatorFor(e.target);
-    });
+ document.querySelectorAll('.troop-input').forEach(inp=>{
+  inp.addEventListener('click', (e)=>{
+    showCalculatorFor(e.target);
   });
+});
 
+   
   // click outside to hide and apply
   document.addEventListener('mousedown', (ev)=>{
     if(!calcElement) return;
