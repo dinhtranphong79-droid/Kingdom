@@ -36,7 +36,7 @@ h2 { margin-bottom: 16px; }
 
 <script type="module">
   
-  import { recomputeSummaryTotal } from "../shared/summary.service.js";
+
 
 
 /* =====================================================
@@ -174,13 +174,22 @@ async function deduct(level){
 }
 async function saveTotalPoints(tabName, points, log){
   const ref = doc(db, "accounts", uid, "tabsData", tabName);
+
   await setDoc(ref,{
     totalPoints: points,
     log: log,
     updatedAt: serverTimestamp()
-  },{merge:true});
+  },{ merge:true });
 
-  await recomputeSummaryTotal(uid);
+  // ✅ IMPORT AN TOÀN – KHÔNG LÀM CHẾT TAB
+  try{
+    const mod = await import("../shared/summary.service.js");
+    if(mod.recomputeSummaryTotal){
+      await mod.recomputeSummaryTotal(uid);
+    }
+  }catch(e){
+    console.warn("Không load được summary.service.js", e);
+  }
 }
 
 
