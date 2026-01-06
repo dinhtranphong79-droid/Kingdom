@@ -244,17 +244,36 @@ function createHeroElement(h){
   const nameCol=document.createElement("div"); nameCol.innerHTML=`<div style="font-weight:600">${h.name}</div><small>${h.system}</small>`;
   const starCol=document.createElement("div"); const starSel=document.createElement("select");
   starSel.innerHTML=Array.from({length:6}).map((_,i)=>`<option value="${i}" ${i===h.current_star?'selected':''}>${i}★</option>`).join("");
-  starSel.onchange=()=>{
-    h.current_star=parseInt(starSel.value,10);
-    if(h.current_bar>maxBarForStar(h.current_star)) h.current_bar=maxBarForStar(h.current_star);
-    saveStateDebounced();
-    renderSummary(); // chỉ update summary, không render lại heroList
-  };
+ starSel.onchange = () => {
+  h.current_star = parseInt(starSel.value, 10);
+
+  renderBarSelect(barSel, h); // 🔥 DÒNG BẮT BUỘC
+
+  saveStateDebounced();
+  renderSummary();
+};
+
   starCol.appendChild(starSel);
 
   const barCol=document.createElement("div"); const barSel=document.createElement("select");
-  const maxBar=maxBarForStar(h.current_star);
-  barSel.innerHTML=Array.from({length:maxBar+1}).map((_,i)=>`<option value="${i}" ${i===h.current_bar?'selected':''}>Bậc ${i}</option>`).join("");
+
+ function renderBarSelect(barSel, hero){
+  const maxBar = maxBarForStar(hero.current_star);
+
+  if (hero.current_bar >= maxBar) {
+    hero.current_bar = Math.max(0, maxBar - 1);
+  }
+
+  barSel.innerHTML = Array.from({ length: maxBar })
+    .map((_, i) =>
+      `<option value="${i}" ${i === hero.current_bar ? "selected" : ""}>Bậc ${i}</option>`
+    ).join("");
+
+  barSel.disabled = maxBar === 0;
+}
+
+  renderBarSelect(barSel, h);
+
   barSel.onchange=()=>{
     h.current_bar=parseInt(barSel.value,10);
     saveStateDebounced();
